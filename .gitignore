@@ -1,0 +1,17 @@
+# dependencies
+node_modules/
+.vscode/
+.idea/
+.wix/
+jsconfig.json
+
+# local and generated files
+.env
+.env.*
+*.log
+*.bak
+*.bak.js
+*.tmp
+.DS_Store
+Thumbs.db
+package-lock.json

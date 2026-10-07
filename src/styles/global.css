@@ -1,0 +1,44 @@
+.lpc-desactive input,
+.lpc-desactive .wixui-text-input__input {
+  color: #8A8A8A !important;
+  -webkit-text-fill-color: #8A8A8A !important;
+  border-color: #C8C8C8 !important;
+  background-color: #F4F4F4 !important;
+  cursor: not-allowed !important;
+  opacity: 1 !important;
+}
+
+/* Classes d'apparence « bouton » des textes de /adminjumelages (05/10/2026, v5).
+   Posées / retirées par le code via customClassList (page-adminjumelage.js 2026-10-05-f). Effet visible sur le site publié seulement.
+   Pas de `width`, de `margin` ni de `display` sur l'élément racine (Wix s'en sert pour le placer et le masquer). */
+.lpc-bouton {
+  box-sizing: border-box;
+  padding: 8px 6px;   /* marge horizontale réduite : le texte (nowrap) doit tenir dans la largeur de l'élément, sinon il déborde à droite */
+  border: 1px solid #C61010;
+  border-radius: 0;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.lpc-bouton, .lpc-bouton * {
+  font-family: 'Poppins', sans-serif !important;
+  font-size: 12px !important;
+  font-weight: 200 !important;
+  line-height: 1.3 !important;
+  white-space: nowrap !important;
+  text-decoration: none !important;
+  text-align: center !important;
+}
+.lpc-bouton * { margin: 0 !important; padding: 0 !important; text-indent: 0 !important; }
+
+/* « Jumeler » et « Mail au porteur » : fond plein ; au survol, couleurs inversées */
+.lpc-bouton-plein { background-color: #C61010 !important; }
+.lpc-bouton-plein, .lpc-bouton-plein * { color: #FFFFFF !important; }
+.lpc-bouton-plein:hover { background-color: #FFFFFF !important; }
+.lpc-bouton-plein:hover, .lpc-bouton-plein:hover * { color: #C61010 !important; }
+
+/* « Annuler » : contour ; au survol, couleurs inversées */
+.lpc-bouton-contour { background-color: #FFFFFF !important; }
+.lpc-bouton-contour, .lpc-bouton-contour * { color: #C61010 !important; }
+.lpc-bouton-contour:hover { background-color: #C61010 !important; }
+.lpc-bouton-contour:hover, .lpc-bouton-contour:hover * { color: #FFFFFF !important; }
