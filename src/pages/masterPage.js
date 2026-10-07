@@ -20,10 +20,10 @@ async function majLienAdmin() {
   IDS_LIEN_ADMIN.forEach((id) => { try { const e = $w(id); if (e && e.length !== 0) els.push(e); } catch (x) { /* absent de cette page */ } });
   if (!els.length) { console.log('[LPC][MP] aucun lien Admin sur cette page (' + IDS_LIEN_ADMIN.join(', ') + ')'); return; }
   els.forEach((el) => { try { el.hide(); } catch (e) { /* ignoré */ } });
-  if (!authentication.loggedIn()) { console.log('[LPC][MP] lienAdmin : visiteur non connecté'); return; }
+  if (!authentication.loggedIn()) { console.log('[LPC][MP] lienAdmin : visiteur non connecté (version 2026-10-07-a)'); return; }
   try {
     const admin = await estAdmin();
-    console.log('[LPC][MP] version 2026-10-06-a · estAdmin =', admin);
+    console.log('[LPC][MP] version 2026-10-07-a · estAdmin =', admin);
     if (admin) els.forEach((el) => { try { el.expand(); } catch (e) { /* ignoré */ } try { el.show(); } catch (e) { /* ignoré */ } });
   } catch (e) { console.warn('[LPC][MP] estAdmin KO:', e && e.message); }
 }
