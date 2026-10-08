@@ -75,7 +75,6 @@ const IDS_TABLE_JUMELAGES = ['#tableJumelage'];
 const IDS_TITRE_JUMELAGES = ['#AdmintitreJumelages'];   // les ID sont sensibles à la casse
 const IDS_TEXTE_JUMELAGES = ['#AdmintexteJumelages'];   // abandonné : replié
 const COLONNES_JUMELAGES = [
-  { dataPath: 'num', label: '', type: 'string' },
   { dataPath: 'nom', label: 'Nom', type: 'string' },
   { dataPath: 'etablissement', label: 'Établissement', type: 'string' },
   { dataPath: 'interets', label: "Centres d'intérêt", type: 'string' }
@@ -126,7 +125,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-m', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-09-b', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -237,7 +236,7 @@ async function initCreation() {
     $w(EL.disponibilites).options = (d.disponibiliteOptions || []).map((v) => ({ label: v, value: v }));
     setVal(EL.disponibilites, []);
   });
-  safe('capacités (vides tant que le statut n’est pas choisi)', () => { $w(EL.capacites).options = []; setVal(EL.capacites, []); });
+  safe('capacités : toutes proposées dès l’ouverture (09/10)', () => { $w(EL.capacites).options = (d.capaciteOptions || []).map((v) => ({ label: v, value: v })); setVal(EL.capacites, []); });
   safe('champ nbResidentsMax', () => {
     preparerNbResidents(null);
     majNbResidents();
@@ -256,10 +255,7 @@ async function initCreation() {
 
 /** Les capacités proposées dépendent du statut choisi ; celles déjà cochées et encore valides sont conservées. */
 function majCapacitesCreation() {
-  const statut = String(valeur(IDS_STATUT.liste) || '');
-  const options = (d.capacitesParStatut || {})[statut] || [];
-  const gardees = (valeur(EL.capacites) || []).filter((v) => options.includes(v));
-  safe('capacités selon le statut', () => { $w(EL.capacites).options = options.map((v) => ({ label: v, value: v })); setVal(EL.capacites, gardees); });
+  // 09/10 : le choix du statut ne filtre plus les capacités (toutes proposées) ; les statuts s'ajoutent côté serveur d'après les capacités cochées
   majNbResidents();
 }
 
@@ -459,6 +455,14 @@ const NAV_ADMIN = [
 function cablerNavigationAdmin() {
   let boutons = [];
   try { const t = $w('Button'); for (let i = 0; i < t.length; i++) boutons.push(t[i]); } catch (e) { boutons = []; }
+  // 09/10 : bouton « Créer un membre » (section Navigation globale) câblé sur TOUTES les pages admin, pas seulement /admin
+  try {
+    const bc = $w('#btnCreerMembre');
+    if (bc && bc.length !== 0 && typeof bc.onClick === 'function') {
+      bc.onClick(() => wixLocation.to('/adminprofil?mode=creation'));
+      try { bc.link = '/adminprofil?mode=creation'; } catch (e) { /* repli sur le clic */ }
+    }
+  } catch (e) { /* bouton absent de cette page */ }
   NAV_ADMIN.forEach((n) => {
     let b = null;
     for (const id of n.ids) { b = optionnel(id); if (b) break; }
@@ -548,27 +552,16 @@ function remplirTableau(liste) {
     try {
       const actuelles = Array.isArray(tab.columns) ? tab.columns : [];
       const cols = COLONNES_JUMELAGES.map((c, i) => Object.assign({}, actuelles[i] || {}, c));   // largeurs de l'éditeur conservées au départ
-      // 08/10 (Bruno) : 1re colonne (numéro, sans titre) inchangée ; les AUTRES colonnes sont dimensionnées d'après leur CONTENU (nom étroit,
-      // établissement plus large, centres d'intérêt le plus large), en gardant le même total que dans l'éditeur (unité du champ `width` conservée)
-      const lg = (c) => Number(c && c.width);
-      if (cols.length > 1 && cols.every((c) => lg(c) > 0)) {
-        const total = cols.reduce((n, c) => n + lg(c), 0);
-        const premiere = Math.min(lg(cols[0]), 12);   // 08/10 : 1re colonne (numéro) plus étroite
-        cols[0].width = premiere;
-        const disponible = total - premiere;
-        const plusLong = (cle) => liste.reduce((m, x) => Math.max(m, String((cle === 'nom' ? x.nom : cle === 'etablissement' ? x.organisme : x.interets) || '').length), 0);
-        const borne = (v, mini, maxi) => Math.max(mini, Math.min(maxi, v));
-        const poids = [borne(plusLong('nom') + 2, 10, 18), borne(plusLong('etablissement') + 2, 14, 40), borne(plusLong('interets') + 2, 20, 90)];
-        const somme = poids.reduce((n, p) => n + p, 0);
-        cols.forEach((c, i) => { if (i > 0) c.width = Math.round((disponible * (poids[i - 1] || 1) / somme) * 100) / 100; });
-        console.log('[LPC] largeurs de #tableJumelage (d\'après le contenu) : ' + cols.map((c) => c.width).join(' / '));
-      } else console.log('[LPC] largeurs de #tableJumelage non lisibles (champ width) : ' + JSON.stringify(actuelles.map((c) => c && c.width)));
+      // 08/10 (Bruno) : colonnes = nom du résident, établissement, centres d'intérêt (plus de numéro) ; largeurs fixes demandées : 120 / 220 / 240
+      const LARGEURS = [120, 220, 240];
+      cols.forEach((c, i) => { if (LARGEURS[i]) c.width = LARGEURS[i]; });
+      console.log('[LPC] largeurs de #tableJumelage : ' + cols.map((c) => c.width).join(' / ') + ' (éditeur : ' + JSON.stringify(actuelles.map((c) => c && c.width)) + ')');
       tab.columns = cols;
     } catch (e) {
       let dp = '?'; try { dp = (tab.columns || []).map((c) => c.dataPath).join(', '); } catch (x) { /* ignoré */ }
       console.warn('[LPC][AdminProfil] colonnes de #tableJumelage non posées (' + (e && e.message) + ') ; dataPath de l\'éditeur : ' + dp);
     }
-    tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), num: String(i + 1), nom: x.nom || '', etablissement: x.organisme || '', interets: x.interets || '' }));
+    tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), nom: x.nom || '', etablissement: x.organisme || '', interets: x.interets || '' }));
     montrer(tab); montrerParents(tab);
     return true;
   } catch (e) { console.error('[LPC] tableau des jumelages KO :', e); return false; }

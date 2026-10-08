@@ -21,7 +21,7 @@ import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import { adminResidentsCourants, adminEnregistrerResidents, adminOuvrirOrganismeDepuisResidents } from 'backend/admin.web';
 
-const VERSION = '2026-10-06-h';
+const VERSION = '2026-10-09-a';
 const PAGE_ORGANISME = '/adminorganisme';
 const PAGE_LISTE = '/admin?onglet=residents';
 // Retour après enregistrement (04/10) : la page d'où l'on vient, transmise par ?depuis=… (aucun identifiant ; le ticket de l'autre page reste
@@ -390,6 +390,14 @@ const NAV_ADMIN = [
 function cablerNavigationAdmin() {
   let boutons = [];
   try { const t = $w('Button'); for (let i = 0; i < t.length; i++) boutons.push(t[i]); } catch (e) { boutons = []; }
+  // 09/10 : bouton « Créer un membre » (section Navigation globale) câblé sur TOUTES les pages admin, pas seulement /admin
+  try {
+    const bc = $w('#btnCreerMembre');
+    if (bc && bc.length !== 0 && typeof bc.onClick === 'function') {
+      bc.onClick(() => wixLocation.to('/adminprofil?mode=creation'));
+      try { bc.link = '/adminprofil?mode=creation'; } catch (e) { /* repli sur le clic */ }
+    }
+  } catch (e) { /* bouton absent de cette page */ }
   NAV_ADMIN.forEach((n) => {
     let b = null;
     for (const id of n.ids) { b = unSeul(id); if (b) break; }

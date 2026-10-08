@@ -1,6 +1,6 @@
 // Code de PAGE « Adminorganisme » (/adminorganisme) : un administrateur modifie la fiche d'un ORGANISME.
 // Page dupliquée de /mon-organisme (mêmes éléments, mêmes ID ou leurs variantes « 1 » : résolution tolérante).
-// version du code : 2026-10-06-b
+// version du code : 2026-10-09-a
 //
 // La fiche visée n'apparaît JAMAIS dans l'URL : le clic sur « Modifier » (onglet Organismes de /admin) crée un
 // ticket serveur (backend/admin.web.js, collection Tickets_Admin). Cette page demande au serveur « l'organisme de
@@ -96,7 +96,7 @@ let ID = {};
 let ticket = '';
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminOrganisme] version du code : 2026-10-06-b');
+  console.log('[LPC][AdminOrganisme] version du code : 2026-10-09-a');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminOrganisme'));
   safe('masquage erreur', hideErr);
@@ -212,6 +212,14 @@ const NAV_ADMIN = [
 function cablerNavigationAdmin() {
   let boutons = [];
   try { const t = $w('Button'); for (let i = 0; i < t.length; i++) boutons.push(t[i]); } catch (e) { boutons = []; }
+  // 09/10 : bouton « Créer un membre » (section Navigation globale) câblé sur TOUTES les pages admin, pas seulement /admin
+  try {
+    const bc = $w('#btnCreerMembre');
+    if (bc && bc.length !== 0 && typeof bc.onClick === 'function') {
+      bc.onClick(() => wixLocation.to('/adminprofil?mode=creation'));
+      try { bc.link = '/adminprofil?mode=creation'; } catch (e) { /* repli sur le clic */ }
+    }
+  } catch (e) { /* bouton absent de cette page */ }
   NAV_ADMIN.forEach((n) => {
     let b = null;
     for (const id of n.ids) { b = optionnel(id); if (b) break; }

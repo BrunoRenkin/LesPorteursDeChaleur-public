@@ -27,7 +27,7 @@ import wixWindowFrontend from 'wix-window-frontend';
 const TEXTE_LIBRE = ['interets', 'infosimportantes'];   // 07/10 : cellules de texte libre tronquées à l'affichage (2 lignes maximum)
 const LONGUEUR_MAX_CELLULE = 60;
 const coupe = (id, t) => (TEXTE_LIBRE.includes(id) && t.length > LONGUEUR_MAX_CELLULE ? t.slice(0, LONGUEUR_MAX_CELLULE - 1).trimEnd() + '…' : t);
-const VERSION = '2026-10-07-a';   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
+const VERSION = '2026-10-09-a';   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
 const NB_CELLULES = 10;
 const COULEUR_ERREUR = '#C0392B';
 const CLASSE_TEXTE = 'font_8';
@@ -483,6 +483,14 @@ const NAV_ADMIN = [
 function cablerNavigationAdmin() {
   let boutons = [];
   try { const t = $w('Button'); for (let i = 0; i < t.length; i++) boutons.push(t[i]); } catch (e) { boutons = []; }
+  // 09/10 : bouton « Créer un membre » (section Navigation globale) câblé sur TOUTES les pages admin, pas seulement /admin
+  try {
+    const bc = $w('#btnCreerMembre');
+    if (bc && bc.length !== 0 && typeof bc.onClick === 'function') {
+      bc.onClick(() => wixLocation.to('/adminprofil?mode=creation'));
+      try { bc.link = '/adminprofil?mode=creation'; } catch (e) { /* repli sur le clic */ }
+    }
+  } catch (e) { /* bouton absent de cette page */ }
   NAV_ADMIN.forEach((n) => {
     let b = null;
     for (const id of n.ids) { b = optionnel(id); if (b) break; }

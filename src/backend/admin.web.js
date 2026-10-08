@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-08-d';
+const VERSION = '2026-10-09-b';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -637,6 +637,22 @@ async function capacitesDuStatut(statutId) {
   return parOrdre(rows, 'capacite').map((r) => r.capacite).filter(Boolean);
 }
 
+/**
+ * Statuts déduits des capacités cochées (même règle que mon-profil.web.js, décision de Bruno 08/10) : Écrire, Transporter -> Porteur ; Lieu -> Partenaire ;
+ * Accueillir -> Accueillant ; Lecture, Activité, Talent -> Porteur, sauf si « Accueillir » est coché (alors Accueillant).
+ */
+function statutsDepuisCapacites(labels) {
+  const ls = asArr(labels).map(sansAccents);
+  const a = (mot) => ls.some((l) => l.includes(mot));
+  const accueille = a('accueillir');
+  const out = new Set();
+  if (a('ecrire') || a('transporter')) out.add('Porteur');
+  if (a('lieu')) out.add('Partenaire');
+  if (accueille) out.add('Accueillant');
+  if (a('lecture') || a('activite') || a('talent')) out.add(accueille ? 'Accueillant' : 'Porteur');
+  return Array.from(out);
+}
+
 /** La page /adminprofil?mode=creation demande les listes : statuts, capacités PAR statut, disponibilités. */
 export const adminCreationOptions = webMethod(Permissions.SiteMember, async () => {
   try { await exigerAdmin('creation-options'); } catch (e) { if (estRefus(e)) return REFUSE; throw e; }
@@ -644,10 +660,13 @@ export const adminCreationOptions = webMethod(Permissions.SiteMember, async () =
   const capacitesParStatut = {};
   for (const s of statuts) capacitesParStatut[s.statut] = await capacitesDuStatut(s._id);
   const dispos = (await wixData.query('Disponibilites').ascending('disponibilite').limit(200).find({ suppressAuth: true })).items;
+  // 09/10 : TOUTES les capacités sont proposées dès l'ouverture (la liste était vide tant qu'aucun statut n'était choisi) ; les statuts s'ajoutent d'après les capacités
+  const toutesCaps = (await wixData.query('Capacites').limit(200).find({ suppressAuth: true })).items;
   return {
     ok: true,
     version: VERSION,
     statuts: statuts.map((s) => s.statut),
+    capaciteOptions: parOrdre(toutesCaps, 'capacite').map((r) => r.capacite).filter(Boolean),
     capacitesParStatut,
     disponibiliteOptions: parOrdre(dispos, 'disponibilite').map((r) => r.disponibilite).filter(Boolean),
   };
@@ -692,13 +711,17 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
   const nom = clean(payload.nom, 80);
   const email = clean(payload.email, 200).toLowerCase();
   if (!prenom || !nom || !MOTIF_EMAIL.test(email)) return { ok: false, reason: 'donnees-invalides' };
-  // 08/10 : le consentement RGPD n'est plus coché par l'admin : la PERSONNE le donne à sa première connexion (/mon-profil), sans quoi pas d'inscription
+  // 09/10 : plus de case RGPD à cocher : si l'admin crée la personne, c'est qu'elle a donné son consentement (décision de Bruno)
 
   const statut = (await statutsDeCreation()).find((s) => norm(s.statut) === norm(payload.statut));
   if (!statut) return { ok: false, reason: 'statut-invalide' };
 
-  const permises = new Set((await capacitesDuStatut(statut._id)).map(norm));
+  const permises = new Set((await wixData.query('Capacites').limit(200).find({ suppressAuth: true })).items.map((r) => norm(r.capacite)));   // 09/10 : toutes les capacités existantes
   const capacites = asArr(payload.capacites).filter((c) => permises.has(norm(c)));
+  // Statuts : celui choisi + ceux déduits des capacités cochées (règle de /mon-profil)
+  const idsStatuts = new Set([statut._id]);
+  const lignesStatuts = await statutsDeCreation();
+  statutsDepuisCapacites(capacites).forEach((nom) => { const r = lignesStatuts.find((x) => norm(x.statut) === norm(nom)); if (r) idsStatuts.add(r._id); });
   const nb = nbResidents(payload.nbResidentsMax);
   if (ecritDesCartes(capacites) && nb == null) return { ok: false, reason: 'nb-requis' };
 
@@ -718,7 +741,7 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
       email, prenom, nom, telephone,
       localite: clean(payload.localite, 120),
       commentaire: clean(payload.commentaire, 2000),
-      consentement_rgpd: false,           // à donner par la personne elle-même à sa première connexion (/mon-profil, case exigée)
+      consentement_rgpd: true,            // créer la personne vaut consentement (Bruno, 09/10) ; un retrait ultérieur reste à traiter (cas non prévu)
       consentement_photo: false,
       abonnement_newsletter: false,
       actif: true,
@@ -728,7 +751,7 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
       _owner: compte._id,
     }, { suppressAuth: true });
     rowId = row._id;
-    await wixData.replaceReferences('Membres', 'type', rowId, [statut._id], { suppressAuth: true });
+    await wixData.replaceReferences('Membres', 'type', rowId, Array.from(idsStatuts), { suppressAuth: true });
     await wixData.replaceReferences('Membres', 'capacites', rowId, await labelsToIds('Capacites', 'capacite', capacites), { suppressAuth: true });
     await wixData.replaceReferences('Membres', 'disponibilites', rowId, await labelsToIds('Disponibilites', 'disponibilite', payload.disponibilites), { suppressAuth: true });
   } catch (e) {
@@ -744,7 +767,7 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
   // Journal : noms des champs, jamais les valeurs ; le statut choisi et l'origine du consentement sont tracés
   await journaliser(admin, 'creer:membres', rowId,
     'champs : prenom, nom, email, telephone, localite, commentaire, capacites, disponibilites, nbResidentsMax · statut : ' + statut.statut
-    + ' · consentement RGPD à donner par la personne à sa première connexion · compte Wix créé sans mot de passe (verified = false) · rôle membre : ' + role);
+    + ' · consentement RGPD réputé donné (création à la demande de la personne) · compte Wix créé sans mot de passe (verified = false) · rôle membre : ' + role);
   return { ok: true, version: VERSION, role };
 });
 

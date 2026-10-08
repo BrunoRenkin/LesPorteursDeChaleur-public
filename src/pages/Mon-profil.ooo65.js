@@ -51,7 +51,6 @@ const BOX_ADMIN = ['#AdminboxResidents'];
 const IDS_GLOBAL_A_REPLIER = ['#boxResidents', '#buttonJumelages', '#titreJumelages', '#textjumelage'];   // anciens éléments de la section globale : abandonnés, repliés ici
 const IDS_TABLE_JUMELAGES = ['#tableJumelage'];
 const COLONNES_JUMELAGES = [
-  { dataPath: 'num', label: '', type: 'string' },
   { dataPath: 'nom', label: 'Nom', type: 'string' },
   { dataPath: 'etablissement', label: 'Établissement', type: 'string' },
   { dataPath: 'interets', label: "Centres d'intérêt", type: 'string' }
@@ -105,7 +104,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-m (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-n (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -280,27 +279,16 @@ function remplirTableau(liste) {
     try {
       const actuelles = Array.isArray(tab.columns) ? tab.columns : [];
       const cols = COLONNES_JUMELAGES.map((c, i) => Object.assign({}, actuelles[i] || {}, c));   // largeurs de l'éditeur conservées au départ
-      // 08/10 (Bruno) : 1re colonne (numéro, sans titre) inchangée ; les AUTRES colonnes sont dimensionnées d'après leur CONTENU (nom étroit,
-      // établissement plus large, centres d'intérêt le plus large), en gardant le même total que dans l'éditeur (unité du champ `width` conservée)
-      const lg = (c) => Number(c && c.width);
-      if (cols.length > 1 && cols.every((c) => lg(c) > 0)) {
-        const total = cols.reduce((n, c) => n + lg(c), 0);
-        const premiere = Math.min(lg(cols[0]), 12);   // 08/10 : 1re colonne (numéro) plus étroite
-        cols[0].width = premiere;
-        const disponible = total - premiere;
-        const plusLong = (cle) => liste.reduce((m, x) => Math.max(m, String((cle === 'nom' ? x.nom : cle === 'etablissement' ? x.organisme : x.interets) || '').length), 0);
-        const borne = (v, mini, maxi) => Math.max(mini, Math.min(maxi, v));
-        const poids = [borne(plusLong('nom') + 2, 10, 18), borne(plusLong('etablissement') + 2, 14, 40), borne(plusLong('interets') + 2, 20, 90)];
-        const somme = poids.reduce((n, p) => n + p, 0);
-        cols.forEach((c, i) => { if (i > 0) c.width = Math.round((disponible * (poids[i - 1] || 1) / somme) * 100) / 100; });
-        console.log('[LPC] largeurs de #tableJumelage (d\'après le contenu) : ' + cols.map((c) => c.width).join(' / '));
-      } else console.log('[LPC] largeurs de #tableJumelage non lisibles (champ width) : ' + JSON.stringify(actuelles.map((c) => c && c.width)));
+      // 08/10 (Bruno) : colonnes = nom du résident, établissement, centres d'intérêt (plus de numéro) ; largeurs fixes demandées : 120 / 220 / 240
+      const LARGEURS = [120, 220, 240];
+      cols.forEach((c, i) => { if (LARGEURS[i]) c.width = LARGEURS[i]; });
+      console.log('[LPC] largeurs de #tableJumelage : ' + cols.map((c) => c.width).join(' / ') + ' (éditeur : ' + JSON.stringify(actuelles.map((c) => c && c.width)) + ')');
       tab.columns = cols;
     } catch (e) {
       let dp = '?'; try { dp = (tab.columns || []).map((c) => c.dataPath).join(', '); } catch (x) { /* ignoré */ }
       console.warn('[LPC][Profil] colonnes de #tableJumelage non posées (' + (e && e.message) + ') ; dataPath de l\'éditeur : ' + dp);
     }
-    tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), num: String(i + 1), nom: x.nom || '', etablissement: x.organisme || '', interets: x.interets || '' }));
+    tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), nom: x.nom || '', etablissement: x.organisme || '', interets: x.interets || '' }));
     montrer(tab); montrerParents(tab);
     return true;
   } catch (e) { console.error('[LPC] tableau des jumelages KO :', e); return false; }
