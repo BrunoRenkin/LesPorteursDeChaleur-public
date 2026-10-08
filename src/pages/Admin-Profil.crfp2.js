@@ -119,7 +119,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-h', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-i', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -518,7 +518,8 @@ function boutonJumelage() {
   montrer(box); montrerParents(box);
   try { let x = box.parent; const ch = []; for (let i = 0; x && i < 5; i++) { ch.push(x.id + ':' + (x.hidden ? 'H' : '') + (x.collapsed ? 'C' : '')); x = x.parent; } console.log('[LPC][AdminProfil] box des jumelages : hidden =', box.hidden, '| collapsed =', box.collapsed, '| visible =', box.isVisible, '| parents :', ch.join(' > ')); } catch (e) { /* ignoré */ }
   inventaireJumelages();
-  boutons.forEach((b) => { if (peutJumeler) { montrer(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
+  // Un seul bouton de jumelage : le premier trouvé (#buttonJumelages, dans la box) ; l'ancien #BtnJumelage (autre conteneur, box158) reste replié
+  boutons.forEach((b, i) => { if (peutJumeler && i === 0) { montrer(b); montrerParents(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
   afficherJumelages();
 }
 /** Diagnostic (08/10) : état à l'exécution de tous les éléments dont l'ID évoque les jumelages ou les résidents (id, masqué, replié, visible, parent). */
