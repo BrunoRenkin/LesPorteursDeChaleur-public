@@ -155,7 +155,7 @@ export const getMyAccueillantData = webMethod(Permissions.SiteMember, async () =
   const email = member ? (member.loginEmail || '').toLowerCase() : '';
   if (!email) return { existe: false, ...opts };
 
-  const row = (await wixData.query(COL_MEMBRES).eq('email', email).include('type')
+  const row = (await wixData.query(COL_MEMBRES).eq('email', email).include('type', 'capacites')
     .limit(1).find({ suppressAuth: true })).items[0];
   if (!row) return { existe: false, ...opts };
 
@@ -193,6 +193,12 @@ export const getMyAccueillantData = webMethod(Permissions.SiteMember, async () =
         commentaire: fromRichText(org.commentaire),
       });
     }
+  }
+  // 08/10 : sans organisation liée (membre venu de /mon-profil avec la capacité « Accueillir »), les souhaits sont préremplis avec ses
+  // capacités DÉJÀ COCHÉES, limitées à celles que ce formulaire propose (sinon la case cochée à l'étape précédente semblait perdue)
+  if (!out.orgExiste) {
+    const siennes = asArr(row.capacites).map((r) => r && r.capacite).filter(Boolean);
+    out.capacites = siennes.filter((c) => (opts.capaciteOptions || []).some((o) => norm(o) === norm(c)));
   }
   return out;
 });

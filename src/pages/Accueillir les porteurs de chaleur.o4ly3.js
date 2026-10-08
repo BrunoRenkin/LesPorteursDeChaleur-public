@@ -33,7 +33,7 @@ const PAGE_MERCI = '/accueillir-les-porteurs-mes-residents';
 const SOUHAITS_OBLIGATOIRES = true;   // >= 1 case cochee exigee
 
 $w.onReady(async () => {
-  console.log('[LPC][F2] version du code : 2026-10-06-a');
+  console.log('[LPC][F2] version du code : 2026-10-08-a');
   console.log('[LPC][F2] champs obligatoires', { souhaits: SOUHAITS_OBLIGATOIRES });
   // Masquer l'erreur AVANT tout appel réseau (sinon elle reste visible si la suite échoue)
   safe('masquage erreur', hideErr);
@@ -98,6 +98,10 @@ $w.onReady(async () => {
       setVal(EL.capacites, d.capacites);
       setVal(EL.commentaire, d.commentaire);
     });
+  }
+  else if ((d.capacites || []).length) {
+    // Pas d'organisation encore : souhaits préremplis d'après les capacités cochées sur /mon-profil (08/10)
+    safe('souhaits issus du profil', () => setVal(EL.capacites, d.capacites));
   }
   console.log('[LPC][F2] organisation chargée', { orgExiste: Boolean(d.orgExiste), nomOrigine, type: d.organismeType });
 
