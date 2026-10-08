@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-08-a';
+const VERSION = '2026-10-08-b';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -130,7 +130,7 @@ async function comptesWixSansFiche(membres) {
         const tel = asArr(c.phones).map((p) => (p && (p.phone || p)) || '').find(Boolean) || '';
         return {
           _id: 'wix:' + m._id,
-          nom: `${c.firstName || ''} ${c.lastName || ''}`.trim() || '(sans nom)',
+          nom: `${c.firstName || ''} ${c.lastName || ''}`.trim() || m.loginEmail || '(sans nom)',   // 08/10 : sans prénom ni nom, l'e-mail (lien mailto) sert de nom
           email: m.loginEmail || '',
           telephone: String(tel),
           localite: '',
@@ -161,7 +161,7 @@ async function lignesMembres() {
     const encours = j.parPorteur.get(m._id) || 0;
     return {
       _id: m._id,
-      nom: `${m.prenom || ''} ${m.nom || ''}`.trim() || '(sans nom)',
+      nom: `${m.prenom || ''} ${m.nom || ''}`.trim() || m.email || '(sans nom)',   // 08/10 : sans prénom ni nom, l'e-mail (lien mailto) sert de nom
       email: m.email || '',
       telephone: m.telephone || '',
       localite: m.localite || '',
