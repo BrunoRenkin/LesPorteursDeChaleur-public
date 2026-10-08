@@ -45,10 +45,11 @@ const EL_OPT = {
 // Bouton vers /mon-organisme (06/10) : affiché seulement si « Proposer un lieu » est coché ; absent de F1 et de /adminprofil (leur code le replie)
 const BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];
 // Box des jumelages (#boxResidents et son contenu) : réservée à /adminprofil, replie ici (elle fait partie de la section globale)
-const BOX_ADMIN = ['#boxResidents', '#BoxResidents', '#AdminboxResidents'];   // + ID « Admin » au cas où la pile de la section globale a été renommée (08/10)
+const BOX_ADMIN = ['#boxResidents', '#BoxResidents'];
+const PILE_ABANDONNEE = ['#AdminboxResidents'];   // ancienne pile « Admin… » de la section globale : abandonnée (à supprimer dans l'éditeur), repliée ici
 // 08/10 : la box est AFFICHÉE ici pour un porteur qui a des jumelages (titre + liste) ; ses boutons restent réservés à /adminprofil
-const IDS_TITRE_JUM = ['#titreJumelages', '#TitreJumelages', '#AdmintitreJumelages'];
-const IDS_TEXTE_JUM = ['#textjumelage', '#textJumelage', '#textJumelages', '#Admintextjumelage'];
+const IDS_TITRE_JUM = ['#titreJumelages', '#TitreJumelages'];
+const IDS_TEXTE_JUM = ['#textjumelage', '#textJumelage', '#textJumelages'];
 const IDS_BOUTONS_ADMIN = ['#buttonJumelages', '#BtnJumelage', '#buttonSendToPorteur'];
 const PAGE_ORGANISME = '/mon-organisme';
 const CAPACITE_LIEU = 'proposer un lieu';
@@ -94,7 +95,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-f (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-g (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -102,7 +103,8 @@ $w.onReady(async () => {
   safe('masquage initial', () => {
     cacher(pileOnglets()); cacher(boiteOnglets()); cacher(boutonResidents());
     cacher(optionnel(EL.consentement));
-    cacher(premier(BOX_ADMIN));          // box des jumelages : admin seulement
+    cacher(premier(BOX_ADMIN));          // box des jumelages : réaffichée par afficherJumelages() pour un porteur jumelé
+    PILE_ABANDONNEE.forEach((id) => cacher(optionnel(id)));
     cacher(premier(BTN_ORGANISATION));   // réaffiché par majBoutonOrganisation() si « Proposer un lieu » est coché
     cacher(champNbResidents()); cacher(premier(TITRE_NB)); cacher(premier(AIDE_NB));
   });

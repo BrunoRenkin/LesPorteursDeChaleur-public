@@ -67,13 +67,13 @@ const DUREE_AIDE_MS = 4000;
 const PAGE_MERCI = '/merci?f=porteur';   // page de remerciement commune F1/F2/F3
 
 $w.onReady(async () => {
-  console.log('[LPC][F1] version du code : 2026-10-08-a (ID de la section globale ; traces photo ; #btnorganisation replié)');
+  console.log('[LPC][F1] version du code : 2026-10-08-b (ID de la section globale ; traces photo ; #btnorganisation replié)');
   // Masquer l'erreur AVANT tout appel reseau (sinon elle reste visible si la suite echoue)
   safe('masquage erreur', hideErr);
   safe('controle des ID', checkIds);
   // Champ, titre et aide repliés d'emblée : Studio n'honore pas toujours « réduit par défaut ». Réaffichés par majNbResidents().
   safe('repli du bouton organisation (réservé à /mon-profil)', () => effacer(premier(['#btnorganisation', '#btnOrganisation'])));
-  safe('repli de la box des jumelages (réservée à /adminprofil)', () => effacer(premier(['#boxResidents', '#BoxResidents'])));
+  safe('repli de la box des jumelages (réservée à /mon-profil et /adminprofil)', () => { effacer(premier(['#boxResidents', '#BoxResidents'])); effacer(premier(['#AdminboxResidents'])); });
   safe('repli initial du champ nbResidentsMax', () => { effacer(champNbResidents()); effacer(premier(TITRE_NB)); effacer(premier(AIDE_NB)); });
   if (!authentication.loggedIn()) { wixLocation.to('/participer'); return; }
   afficherEmailConnecte();   // sans await : ne retarde pas le formulaire
