@@ -9,11 +9,12 @@
 import { authentication } from 'wix-members-frontend';
 import { syncCurrentMemberToCollection } from 'backend/members-sync.web';
 import { estAdmin } from 'backend/admin.web';
+import { getMonProfil } from 'backend/mon-profil.web';
 import wixLocation from 'wix-location-frontend';
 import { session } from 'wix-storage-frontend';
 
 // Version du code global (estampille, console : [LPC][MP]).
-const VERSION_MP = '2026-10-08-b';
+const VERSION_MP = '2026-10-08-c';
 
 // Redirection après connexion (Bruno, 08/10) : un membre qui se connecte depuis une page PUBLIQUE
 // (accueil, pages d'information, pages /auth/* de réinitialisation du mot de passe) arrive sur /mon-profil.
@@ -39,8 +40,23 @@ function redirectionPermise(segment) {
   console.log('[LPC][MP] redirection après connexion : page « /' + segment + ' » ' + (exclue ? 'exclue' : 'autorisée'));
   return !exclue;
 }
-function poserDrapeauRedirection() {
-  try { session.setItem(CLE_REDIRECTION, String(Date.now())); } catch (e) { console.warn('[LPC][MP] drapeau de redirection non posé :', e && e.message); }
+// 08/10 : destination selon le profil. Un Accueillant (ou Partenaire) SANS organisation est envoyé vers le formulaire de son lieu (F2, F3) ;
+// les autres sur /mon-profil. En cas de doute (erreur, fiche absente) : /mon-profil.
+const PAGE_F2 = '/accueillir-des-porteur-de-chaleur';
+const PAGE_F3 = '/devenir-partenaire';
+async function destinationApresConnexion() {
+  try {
+    const r = await getMonProfil();
+    if (r && r.existe && r.profil && !r.organisation) {
+      const st = (r.profil.statuts || []).map((s) => String(s || '').toLowerCase());
+      if (st.indexOf('accueillant') !== -1) return PAGE_F2;
+      if (st.indexOf('partenaire') !== -1) return PAGE_F3;
+    }
+  } catch (e) { console.warn('[LPC][MP] destination après connexion : profil illisible, /mon-profil :', e && e.message); }
+  return PAGE_APRES_CONNEXION;
+}
+function poserDrapeauRedirection(dest) {
+  try { session.setItem(CLE_REDIRECTION, JSON.stringify({ t: Date.now(), dest: dest || PAGE_APRES_CONNEXION })); } catch (e) { console.warn('[LPC][MP] drapeau de redirection non posé :', e && e.message); }
 }
 // Au chargement : si un drapeau récent existe et que le membre est connecté, on redirige (puis on l'efface).
 function appliquerRedirectionEnAttente() {
@@ -48,8 +64,11 @@ function appliquerRedirectionEnAttente() {
   try { drapeau = session.getItem(CLE_REDIRECTION); session.removeItem(CLE_REDIRECTION); } catch (e) { return; }
   if (!drapeau) return;
   if (!authentication.loggedIn()) return;
-  if (Date.now() - Number(drapeau) > DUREE_DRAPEAU_MS) { console.log('[LPC][MP] drapeau de redirection périmé, ignoré'); return; }
-  if (redirectionPermise(segmentCourant())) wixLocation.to(PAGE_APRES_CONNEXION);
+  let t = Number(drapeau);
+  let dest = PAGE_APRES_CONNEXION;
+  try { const o = JSON.parse(drapeau); if (o && o.t) { t = Number(o.t); dest = o.dest || dest; } } catch (e) { /* ancien format : un nombre */ }
+  if (Date.now() - t > DUREE_DRAPEAU_MS) { console.log('[LPC][MP] drapeau de redirection périmé, ignoré'); return; }
+  if (redirectionPermise(segmentCourant())) { console.log('[LPC][MP] redirection après connexion vers', dest); wixLocation.to(dest); }
 }
 
 // Lien « Admin » de l'en-tête : masqué par défaut, affiché pour les seuls admins.
@@ -86,8 +105,9 @@ $w.onReady(() => {
     // Chemin vivant s'il est lisible, sinon celui mémorisé au chargement.
     const segment = segmentCourant() || segmentMemorise;
     if (redirectionPermise(segment)) {
-      poserDrapeauRedirection();      // si Wix recharge la page, la redirection se fait au chargement suivant
-      wixLocation.to(PAGE_APRES_CONNEXION);
+      const dest = await destinationApresConnexion();
+      poserDrapeauRedirection(dest);      // si Wix recharge la page, la redirection se fait au chargement suivant
+      wixLocation.to(dest);
     }
   });
 });

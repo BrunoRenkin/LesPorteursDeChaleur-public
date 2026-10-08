@@ -23,9 +23,9 @@
 import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
-import { adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix } from 'backend/admin.web';
+import { adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 
-const VERSION = '2026-10-08-a';   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-08-b';   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -205,7 +205,7 @@ function remplirItem($item, d) {
   }
   safe('bouton Modifier', () => {
     const b = $item('#btnModifier');
-    if (b && 'label' in b) b.label = d.nonValide ? 'Créer le profil' : (LIBELLE_BOUTON[onglet] || 'Modifier');   // compte Wix sans fiche : « Créer le profil » crée la fiche (renommé le 08/10, ex-« Valider »)
+    if (b && 'label' in b) b.label = d.nonValide ? (d.emailNonVerifie ? 'Envoyer le lien' : 'Créer le profil') : (LIBELLE_BOUTON[onglet] || 'Modifier');   // compte Wix sans fiche : « Créer le profil » crée la fiche (renommé le 08/10, ex-« Valider »)
     if (b && typeof b.onClick === 'function') b.onClick(() => ouvrir(d));
     if (b && b.show) b.show();
     if (b && typeof b.onClick === 'function') return;
@@ -447,9 +447,25 @@ async function valider(ligne) {
   } finally { validationEnCours = false; }
 }
 
+/** « Envoyer le lien » (compte Wix à e-mail non vérifié) : Wix envoie à la personne l'e-mail de définition du mot de passe, qui vérifie l'e-mail. */
+async function envoyerLien(ligne) {
+  if (validationEnCours) return;
+  validationEnCours = true;
+  setTxt('#messageErreur', '');
+  try {
+    const res = (await adminEnvoyerLienMotDePasse({ id: ligne.id })) || {};
+    console.log('[LPC][Admin] lien de mot de passe', { ok: res.ok, reason: res.reason });
+    if (res.refuse) { refuse(); return; }
+    setTxt('#messageErreur', res.ok ? 'Lien envoyé à la personne. Prévenez-la (e-mail manuel) : elle définit son mot de passe puis se connecte.' : "L'envoi du lien a échoué, merci de réessayer.", res.ok ? '#1E8449' : COULEUR_ERREUR);
+  } catch (e) {
+    console.error('[LPC][Admin] adminEnvoyerLienMotDePasse KO:', e);
+    setTxt('#messageErreur', "L'envoi du lien a échoué, merci de réessayer.", COULEUR_ERREUR);
+  } finally { validationEnCours = false; }
+}
+
 async function ouvrir(ligne) {
   if (!ligne) return;
-  if (ligne.nonValide) { await valider(ligne); return; }
+  if (ligne.nonValide) { await (ligne.emailNonVerifie ? envoyerLien(ligne) : valider(ligne)); return; }
   console.log('[LPC][Admin] ligne choisie :', onglet, ligne.id);
   const page = PAGE_FICHE[onglet];
   if (!page) {

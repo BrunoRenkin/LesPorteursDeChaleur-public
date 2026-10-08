@@ -25,7 +25,7 @@ const updateMember = elevate(members.updateMember);   // « Manage Members »
  *   Seul changement : `nbResidentsMax` est désormais MODIFIABLE ici comme dans F1 (voir enregistrerMonProfil).
  */
 
-const VERSION = '2026-10-08-e';
+const VERSION = '2026-10-08-f';
 const SITE_ID = 'REDACTED-WIX-SITE-ID';
 
 const COL_MEMBRES = 'Membres';
@@ -257,6 +257,7 @@ export const getMonProfil = webMethod(Permissions.SiteMember, async () => {
     capacites: libelles(row.capacites, 'capacite'),
     disponibilites: libelles(row.disponibilites, 'disponibilite'),
     consentementPhoto: row.consentement_photo === true,
+    consentementRgpd: row.consentement_rgpd === true,   // 08/10 : faux pour un compte créé par l'admin tant que la personne n'a pas confirmé
     nbResidentsMax: nbResidents(row.nbResidentsMax),
   };
 
@@ -347,6 +348,7 @@ export const enregistrerMonProfil = webMethod(Permissions.SiteMember, async (pay
   if (fourni('fonction')) p.fonction = fonction;
   if (fourni('commentaire')) p.commentaire = commentaire;
   if (fourni('consentementPhoto')) p.consentement_photo = payload.consentementPhoto === true;
+  if (payload.consentementRgpd === true && row.consentement_rgpd !== true) p.consentement_rgpd = true;   // 08/10 : accord donné par la personne (jamais retiré ici)
   if (photoUrl) p.photo = photoUrl;
   else if (supprimerPhoto) p.photo = '';
   // « Écrire » décochée -> nombre effacé (option A). Mon-Organisme n'envoie pas `capacites` : intact.

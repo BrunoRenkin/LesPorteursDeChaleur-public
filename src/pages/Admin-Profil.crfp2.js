@@ -31,7 +31,7 @@
 import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
-import { adminCreationOptions, adminCreerMembre, adminFicheCourante, adminEnregistrerMembre, adminOuvrirOrganismeDuMembre, adminOuvrirMembreRattache, adminOuvrirResidents, adminEmailPorteurCourant } from 'backend/admin.web';
+import { adminCreationOptions, adminCreerMembre, adminFicheCourante, adminEnregistrerMembre, adminOuvrirOrganismeDuMembre, adminOuvrirMembreRattache, adminOuvrirResidents, adminEmailPorteurCourant, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 import { tracerClient } from 'backend/trace-client.web';
 
 // ID de la section globale (identiques à F1 et /mon-profil). Sensibles à la casse.
@@ -82,7 +82,8 @@ const COLONNES_JUMELAGES = [
 ];
 const STATUTS_PAR_DEFAUT = ['Porteur', 'Accueillant', 'Partenaire'];   // repli si le serveur n'envoie pas `statutOptions` (backend ancien) ; le serveur valide
 const IDS_BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];   // réservé à /mon-profil : replié ici
-const IDS_BTN_EMAIL = ['#buttonSendToPorteur'];   // masqué par défaut ; affiché quand le porteur a tous ses jumelages
+const IDS_BTN_EMAIL = ['#buttonSendToPorteur'];
+const IDS_BTN_LIEN_MDP = ['#buttonLienMdp', '#buttonLienMotDePasse'];   // facultatif (08/10) : « Envoyer le lien de mot de passe », visible si l'e-mail du compte n'est pas vérifié   // masqué par défaut ; affiché quand le porteur a tous ses jumelages
 const GMAIL_COMPTE = 'lesporteursdechaleur@gmail.com';   // ⚠️ compte Gmail d'envoi à CONFIRMER par Bruno (vide = compte Google par défaut du navigateur)
 const LONGUEUR_MAX_URL = 6000;   // au-delà, le texte est aussi copié dans le presse-papiers (⚠️ limite réelle de Gmail non vérifiée)
 /** Fenêtre de rédaction Gmail pré-remplie (Bruno, 04/10 : l'envoi se fait depuis Gmail, plus de mailto). Rien n'est envoyé : l'admin relit puis envoie. */
@@ -125,7 +126,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-l', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-m', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -140,6 +141,7 @@ $w.onReady(async () => {
     cacher(premier(IDS_TABLE_JUMELAGES)); cacher(premier(IDS_TEXTE_JUMELAGES));   // réaffichés par afficherJumelages()
     cacher(premier(IDS_BOX_RESIDENTS));   // réaffichée par boutonJumelage() pour un porteur
     cacher(premier(IDS_BTN_ORGANISATION));
+    IDS_BTN_LIEN_MDP.forEach((id) => cacher(optionnel(id)));   // réaffiché par boutonLienMdp() si l'e-mail n'est pas vérifié
     cacher(premier(IDS_BTN_EMAIL));      // réaffiché par boutonEmail() si le quota du porteur est rempli
     cacher(optionnel(IDS_STATUT.liste)); cacher(optionnel(IDS_STATUT.titre));   // réaffichés par initCreation()
   });
@@ -214,14 +216,7 @@ async function initCreation() {
     console.log('[LPC][AdminProfil] création : e-mail #' + el.id + ' | enabled = ' + el.enabled + ' | readOnly = ' + el.readOnly);
     try { if (el.readOnly === true) el.readOnly = false; } catch (e) { /* ignoré */ }
   });
-  safe('consentement RGPD à cocher', () => {
-    const c = optionnel(ID_RGPD);
-    if (!c) { console.warn('[LPC][AdminProfil] ' + ID_RGPD + ' introuvable : consentement RGPD non affiché'); return; }
-    montrer(c);
-    try { c.checked = false; } catch (e) { /* ignoré */ }
-    try { if (typeof c.enable === 'function') c.enable(); } catch (e) { /* ignoré */ }
-    try { if (c.customClassList) c.customClassList.remove('lpc-desactive'); } catch (e) { /* ignoré */ }
-  });
+  safe('consentement RGPD : donné par la personne elle-même', () => { cacher(optionnel(ID_RGPD)); });   // 08/10 : plus coché par l'admin (la personne le donne à sa première connexion)
   try { d = (await adminCreationOptions()) || {}; } catch (e) {
     console.error('[LPC][AdminProfil] adminCreationOptions KO (backend admin.web.js non collé en 2026-10-07-a ?) :', e);
     showErr('Impossible de charger les listes (statuts, capacités). Rechargez la page ; si le problème persiste, prévenez Bruno.');
@@ -291,8 +286,6 @@ async function sauverCreation() {
     const saisi = String(champNbResidents().value || '').trim();
     if (!nombreDe(saisi)) manque.push('indiquer un nombre de cartes entre 1 et 99');
   }
-  const rgpd = optionnel(ID_RGPD);
-  if (!rgpd || rgpd.checked !== true) manque.push('cocher le consentement RGPD (recueilli oralement ou par e-mail)');
   if (manque.length) { showErr("Le formulaire n'est pas complet : merci de " + manque.join('; ') + '.'); return; }
 
   creationEnCours = true;
@@ -309,7 +302,6 @@ async function sauverCreation() {
       capacites: valeur(EL.capacites),
       disponibilites: valeur(EL.disponibilites),
       nbResidentsMax: nbSaisissable() ? (nombreDe(champNbResidents().value) || undefined) : undefined,
-      consentementRgpd: true,
     })) || {};
     console.log('[LPC][AdminProfil] création', { ok: res.ok, reason: res.reason, role: res.role, version: res.version });
     if (res.refuse) { wixLocation.to('/'); return; }
@@ -341,6 +333,7 @@ function remplir() {
   safe('bouton de jumelage', boutonJumelage);
   safe('statut à définir', statutADefinir);
   safe('bouton e-mail au porteur', boutonEmail);
+  safe('bouton lien de mot de passe', boutonLienMdp);
   safe('consentement RGPD grisé', griserRgpd);
   safe('profil', () => {
     setVal(EL.prenom, p.prenom);
@@ -560,7 +553,9 @@ function remplirTableau(liste) {
       const lg = (c) => Number(c && c.width);
       if (cols.length > 1 && cols.every((c) => lg(c) > 0)) {
         const total = cols.reduce((n, c) => n + lg(c), 0);
-        const disponible = total - lg(cols[0]);
+        const premiere = Math.min(lg(cols[0]), 12);   // 08/10 : 1re colonne (numéro) plus étroite
+        cols[0].width = premiere;
+        const disponible = total - premiere;
         const plusLong = (cle) => liste.reduce((m, x) => Math.max(m, String((cle === 'nom' ? x.nom : cle === 'etablissement' ? x.organisme : x.interets) || '').length), 0);
         const borne = (v, mini, maxi) => Math.max(mini, Math.min(maxi, v));
         const poids = [borne(plusLong('nom') + 2, 10, 18), borne(plusLong('etablissement') + 2, 14, 40), borne(plusLong('interets') + 2, 20, 90)];
@@ -649,6 +644,28 @@ async function ouvrirJumelage() {
 // ─── e-mail de jumelage au porteur (04/10) ───────────────────────────────
 // Le bouton #buttonSendToPorteur (masqué par défaut) n'apparaît que si le porteur a TOUS ses jumelages (quota rempli, calculé par le
 // serveur : d.emailPorteurPossible). Un clic = brouillon ouvert dans Gmail (fenêtre de rédaction), RIEN n'est envoyé par le site.
+let lienEnCours = false;
+/** « Envoyer le lien de mot de passe » : visible seulement si l'e-mail du compte Wix n'est PAS vérifié (d.emailVerifie === false). Wix envoie à la personne l'e-mail
+ *  de définition du mot de passe ; ce parcours vérifie l'e-mail. L'admin prévient ensuite la personne à la main. */
+function boutonLienMdp() {
+  const b = premier(IDS_BTN_LIEN_MDP);
+  if (!b) { console.log('[LPC][AdminProfil] bouton « Envoyer le lien de mot de passe » absent (facultatif : ' + IDS_BTN_LIEN_MDP[0] + ')'); return; }
+  if (d.emailVerifie !== false) { cacher(b); return; }
+  montrer(b); montrerParents(b);
+  if (typeof b.onClick !== 'function') return;
+  b.onClick(async () => {
+    if (lienEnCours) return;
+    lienEnCours = true; hideErr();
+    try {
+      const res = (await adminEnvoyerLienMotDePasse({ ticket })) || {};
+      console.log('[LPC][AdminProfil] lien de mot de passe', { ok: res.ok, reason: res.reason });
+      if (res.refuse) { wixLocation.to('/'); return; }
+      if (res.ok) showErr('Lien envoyé à la personne. Prévenez-la (e-mail manuel) : elle définit son mot de passe puis se connecte.', '#1E8449');
+      else showErr("L'envoi du lien a échoué, merci de réessayer dans un instant.");
+    } catch (e) { console.error('[LPC][AdminProfil] adminEnvoyerLienMotDePasse KO:', e); showErr("L'envoi du lien a échoué, merci de réessayer dans un instant."); }
+    lienEnCours = false;
+  });
+}
 function boutonEmail() {
   const b = premier(IDS_BTN_EMAIL);
   if (!b) { console.warn('[LPC][AdminProfil] #buttonSendToPorteur introuvable'); return; }

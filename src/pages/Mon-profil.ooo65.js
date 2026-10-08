@@ -99,12 +99,13 @@ const COULEUR_QUESTION = '#B9770E';
 
 let d = {};
 let photoASupprimer = false;
+let rgpdAConfirmer = false;   // 08/10 : compte créé par l'admin : la personne doit cocher l'accord RGPD à sa première connexion, sinon pas d'inscription
 let nbEnregistre = null;
 let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-l (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-m (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -199,6 +200,13 @@ function peindre(el, couleurs) {
 // ─── préremplissage ──────────────────────────────────────────────────────
 function remplir() {
   const p = d.profil || {};
+  safe('consentement RGPD à confirmer', () => {
+    rgpdAConfirmer = p.consentementRgpd !== true;
+    const c = optionnel(EL.consentement);
+    if (!c) { if (rgpdAConfirmer) console.warn('[LPC][Profil] ' + EL.consentement + ' introuvable : accord RGPD à confirmer mais case absente'); return; }
+    if (rgpdAConfirmer) { try { c.checked = false; } catch (e) { /* ignoré */ } montrer(c); montrerParents(c); } else cacher(c);
+    console.log('[LPC][Profil] accord RGPD', rgpdAConfirmer ? 'À CONFIRMER par la personne' : 'déjà donné');
+  });
   safe('profil', () => {
     setVal(EL.prenom, p.prenom);
     setVal(EL.nom, p.nom);
@@ -277,7 +285,9 @@ function remplirTableau(liste) {
       const lg = (c) => Number(c && c.width);
       if (cols.length > 1 && cols.every((c) => lg(c) > 0)) {
         const total = cols.reduce((n, c) => n + lg(c), 0);
-        const disponible = total - lg(cols[0]);
+        const premiere = Math.min(lg(cols[0]), 12);   // 08/10 : 1re colonne (numéro) plus étroite
+        cols[0].width = premiere;
+        const disponible = total - premiere;
         const plusLong = (cle) => liste.reduce((m, x) => Math.max(m, String((cle === 'nom' ? x.nom : cle === 'etablissement' ? x.organisme : x.interets) || '').length), 0);
         const borne = (v, mini, maxi) => Math.max(mini, Math.min(maxi, v));
         const poids = [borne(plusLong('nom') + 2, 10, 18), borne(plusLong('etablissement') + 2, 14, 40), borne(plusLong('interets') + 2, 20, 90)];
@@ -443,6 +453,7 @@ async function sauver() {
   if (!(valeur(EL.prenom) || '').trim() || !(valeur(EL.nom) || '').trim()) manque.push('indiquer votre prénom et votre nom');
   if (!(valeur(EL.capacites) || []).length) manque.push('nous communiquer au moins une réponse à "Comment aimeriez-vous porter de la chaleur ?"');
   if (!(valeur(EL.disponibilites) || []).length) manque.push('nous faire part de votre disponibilité');
+  if (rgpdAConfirmer && !coche(EL.consentement)) manque.push("accepter que vos données soient traitées conformément à la politique de confidentialité (sans cet accord, votre inscription ne peut pas être enregistrée)");
   const photoEnAttente = !!(valeur(EL.photo) && valeur(EL.photo).length);
   if (photoEnAttente && !coche(EL.consentementPhoto)) {
     manque.push("cocher la case de consentement à l'utilisation de votre photo, ou retirer la photo que vous venez d'ajouter");
@@ -497,6 +508,7 @@ async function sauver() {
       capacites: valeur(EL.capacites),
       disponibilites: valeur(EL.disponibilites),
       consentementPhoto: coche(EL.consentementPhoto),
+      consentementRgpd: rgpdAConfirmer ? true : undefined,
       nbResidentsMax: nbEnvoye,
       photoUrl, photoW, photoH,
       supprimerPhoto: photoASupprimer,

@@ -1,6 +1,6 @@
 import { Permissions, webMethod } from 'wix-web-module';
 import wixData from 'wix-data';
-import { members, authorization } from 'wix-members-backend';
+import { members, authorization, authentication } from 'wix-members-backend';
 import { members as membersV2 } from 'wix-members.v2';
 import { contacts } from 'wix-crm-backend';
 import { elevate } from 'wix-auth';
@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-08-c';
+const VERSION = '2026-10-08-d';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -155,6 +155,7 @@ async function comptesWixSansFiche(membres, items) {
           ...dates(m),
           _jum: 0,
           nonValide: true,
+          emailNonVerifie: m.loginEmailVerified === false,   // 08/10 : le bouton de la ligne devient « Envoyer le lien »
           filtres: m.loginEmailVerified === false ? [LIB_NON_VERIFIE, FILTRE_SANS_PROFIL] : [FILTRE_SANS_PROFIL],
         };
       });
@@ -188,6 +189,7 @@ async function lignesMembres() {
       cartes: cartes ? `${encours} / ${max || '?'}` : '',
       ...dates(m),
       _jum: encours,
+      emailNonVerifie,
       filtres: [...statuts, cartes ? 'Écrit des cartes' : '', cartes && encours < max ? 'Non jumelés' : '', emailNonVerifie ? LIB_NON_VERIFIE : ''].filter(Boolean),
     };
   });
@@ -276,7 +278,7 @@ async function lignesFiltrees(params = {}) {
   const gardees = lignes.filter((l) => {
     if (filtre !== TOUS && !l.filtres.some((f) => sansAccents(f) === filtre)) return false;
     if (!q) return true;
-    const meule = sansAccents(Object.entries(l).filter(([k]) => k !== '_id' && k !== '_jum' && k !== 'filtres' && k !== 'cree' && k !== 'modifie' && k !== 'nonValide').map(([, v]) => v).join(' '));
+    const meule = sansAccents(Object.entries(l).filter(([k]) => k !== '_id' && k !== '_jum' && k !== 'filtres' && k !== 'cree' && k !== 'modifie' && k !== 'nonValide' && k !== 'emailNonVerifie').map(([, v]) => v).join(' '));
     return q.split(/\s+/).every((mot) => meule.includes(mot));
   });
   gardees.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
@@ -300,7 +302,7 @@ export const adminExport = webMethod(Permissions.SiteMember, async (params = {})
   let admin;
   try { admin = await exigerAdmin('export'); } catch (e) { if (estRefus(e)) return REFUSE; throw e; }
   const { onglet, lignes } = await lignesFiltrees(params);
-  const cles = lignes.length ? Object.keys(lignes[0]).filter((k) => k !== '_id' && k !== 'nonValide') : [];
+  const cles = lignes.length ? Object.keys(lignes[0]).filter((k) => k !== '_id' && k !== 'nonValide' && k !== 'emailNonVerifie') : [];
   const csv = [cles.map(csvCell).join(';'), ...lignes.map((l) => cles.map((k) => csvCell(l[k])).join(';'))].join('\n');
   const emails = onglet === 'membres' ? lignes.map((l) => l.email).filter(Boolean).join('; ') : '';
   // Un export = une extraction de données personnelles : toujours tracé.
@@ -463,9 +465,14 @@ export const adminFicheCourante = webMethod(Permissions.SiteMember, async () => 
         .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
     } catch (e) { jumelagesEnCours = 0; listeJumelages = []; }
   }
+  let emailVerifie = null;   // 08/10 : état de vérification de l'e-mail du compte Wix (null = inconnu) ; pilote #buttonLienMdp
+  if (row.wixMemberId) {
+    try { const w = await getMemberWix(row.wixMemberId, { fieldsets: ['FULL'] }); emailVerifie = w && typeof w.loginEmailVerified === 'boolean' ? w.loginEmailVerified : null; } catch (e) { emailVerifie = null; }
+  }
   return {
     ok: true,
     version: VERSION,
+    emailVerifie,
     ticket: t._id,
     expire: t.expire,
     jumelages: { encours: jumelagesEnCours, max: maxCartes, liste: listeJumelages },   // pas de données de santé : nom, initiale, organisme, centres d'intérêt
@@ -685,7 +692,7 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
   const nom = clean(payload.nom, 80);
   const email = clean(payload.email, 200).toLowerCase();
   if (!prenom || !nom || !MOTIF_EMAIL.test(email)) return { ok: false, reason: 'donnees-invalides' };
-  if (payload.consentementRgpd !== true) return { ok: false, reason: 'consentement-requis' };
+  // 08/10 : le consentement RGPD n'est plus coché par l'admin : la PERSONNE le donne à sa première connexion (/mon-profil), sans quoi pas d'inscription
 
   const statut = (await statutsDeCreation()).find((s) => norm(s.statut) === norm(payload.statut));
   if (!statut) return { ok: false, reason: 'statut-invalide' };
@@ -711,7 +718,7 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
       email, prenom, nom, telephone,
       localite: clean(payload.localite, 120),
       commentaire: clean(payload.commentaire, 2000),
-      consentement_rgpd: true,            // recueilli hors du site par l'administrateur (journalisé)
+      consentement_rgpd: false,           // à donner par la personne elle-même à sa première connexion (/mon-profil, case exigée)
       consentement_photo: false,
       abonnement_newsletter: false,
       actif: true,
@@ -737,7 +744,7 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
   // Journal : noms des champs, jamais les valeurs ; le statut choisi et l'origine du consentement sont tracés
   await journaliser(admin, 'creer:membres', rowId,
     'champs : prenom, nom, email, telephone, localite, commentaire, capacites, disponibilites, nbResidentsMax · statut : ' + statut.statut
-    + ' · consentement RGPD recueilli hors site, confirmé par l’administrateur · compte Wix créé sans mot de passe (verified = false) · rôle membre : ' + role);
+    + ' · consentement RGPD à donner par la personne à sa première connexion · compte Wix créé sans mot de passe (verified = false) · rôle membre : ' + role);
   return { ok: true, version: VERSION, role };
 });
 
@@ -1656,4 +1663,47 @@ export const adminOuvrirOrganismeDepuisListeMembres = webMethod(Permissions.Site
   catch (e) { console.warn('[LPC][Admin] ticket KO', e && e.message); return { ok: false, reason: 'tickets-indisponibles' }; }
   await journaliser(admin, 'ouvrir:organismes', org._id, 'depuis la liste des membres');
   return { ok: true };
+});
+
+/**
+ * « Envoyer le lien de mot de passe » (08/10, décision de Bruno) : demande à Wix d'envoyer à la PERSONNE l'e-mail de définition du mot de passe
+ * (wix-members-backend `authentication.sendSetPasswordEmail`). C'est ce parcours qui VÉRIFIE l'e-mail du compte (constaté le 08/10) ; aucun
+ * moyen d'agir sur `loginEmailVerified` autrement. E-mail automatique envoyé à un tiers : l'admin doit ensuite PRÉVENIR la personne à la main.
+ * params = { ticket } (fiche ouverte dans /adminprofil) ou { id } (ligne de /admin : « wix:<compte> » ou identifiant de fiche). JOURNALISÉ (adresse non journalisée).
+ */
+export const adminEnvoyerLienMotDePasse = webMethod(Permissions.SiteMember, async (params = {}) => {
+  let admin;
+  try { admin = await exigerAdmin('envoyer-lien-mdp'); } catch (e) { if (estRefus(e)) return REFUSE; throw e; }
+  let email = '';
+  let cible = '';
+  try {
+    if (params.ticket) {
+      const t = await ticketDe(admin, clean(params.ticket, 80));
+      if (!t || t.entite !== 'membres') return { ok: false, reason: 'ticket-invalide' };
+      const row = (await wixData.query('Membres').eq('_id', t.cibleId).limit(1).find({ suppressAuth: true })).items[0];
+      if (!row) return { ok: false, reason: 'introuvable' };
+      email = String(row.email || '').toLowerCase();
+      cible = row._id;
+    } else {
+      const id = clean(params.id, 80);
+      if (id.indexOf('wix:') === 0) {
+        const w = await getMemberWix(id.slice(4), { fieldsets: ['FULL'] });
+        email = String((w && w.loginEmail) || '').toLowerCase();
+      } else {
+        const row = (await wixData.query('Membres').eq('_id', id).limit(1).find({ suppressAuth: true })).items[0];
+        email = String((row && row.email) || '').toLowerCase();
+      }
+      cible = id;
+    }
+  } catch (e) { return { ok: false, reason: 'introuvable' }; }
+  if (!MOTIF_EMAIL.test(email)) return { ok: false, reason: 'introuvable' };
+  try {
+    await authentication.sendSetPasswordEmail(email, { hideIgnoreMessage: true });
+  } catch (e) {
+    console.error('[LPC][Admin] sendSetPasswordEmail KO :', e && (e.message || e));
+    await journaliser(admin, 'envoyer-lien-mdp-KO', cible, 'envoi refusé ou en échec');
+    return { ok: false, reason: 'envoi-ko' };
+  }
+  await journaliser(admin, 'envoyer-lien-mdp', cible, 'e-mail Wix de définition du mot de passe envoyé à la personne (adresse non journalisée)');
+  return { ok: true, version: VERSION };
 });
