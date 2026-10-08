@@ -25,7 +25,7 @@ const updateMember = elevate(members.updateMember);   // « Manage Members »
  *   Seul changement : `nbResidentsMax` est désormais MODIFIABLE ici comme dans F1 (voir enregistrerMonProfil).
  */
 
-const VERSION = '2026-10-08-a';
+const VERSION = '2026-10-08-b';
 const SITE_ID = 'REDACTED-WIX-SITE-ID';
 
 const COL_MEMBRES = 'Membres';
@@ -127,17 +127,12 @@ async function ficheCourante() {
 
 /** Options proposées, calculées d'après les STATUTS du membre. */
 async function options(statutIds) {
-  // Membre SANS statut (08/10, option C) : plus de repli sur toutes les capacités ; on ne propose que celles des
-  // statuts Accueillant et Partenaire (dont « Proposer un lieu »), pour que le statut vienne de la création d'organisation.
-  let idsCaps = statutIds;
-  if (!idsCaps.length) {
-    const sts = (await wixData.query(COL_STATUTS).limit(50).find({ suppressAuth: true })).items;
-    idsCaps = sts.filter((s) => GENRES_ORGANISME.some((g) => norm(g) === norm(s.statut))).map((s) => s._id);
-  }
+  // Membre SANS statut : TOUTES les capacités sont proposées (08/10, Bruno : la majorité des membres seront des Porteurs) ;
+  // le statut est déduit des capacités cochées à l'enregistrement (statutsDepuisCapacites).
   const [caps, dispos, types] = await Promise.all([
-    idsCaps.length
-      ? wixData.query(COL_CAPACITES).hasSome('typesDeMembre', idsCaps).ascending('capacite').limit(200).find({ suppressAuth: true })
-      : Promise.resolve({ items: [] }),
+    statutIds.length
+      ? wixData.query(COL_CAPACITES).hasSome('typesDeMembre', statutIds).ascending('capacite').limit(200).find({ suppressAuth: true })
+      : wixData.query(COL_CAPACITES).ascending('capacite').limit(200).find({ suppressAuth: true }),
     wixData.query(COL_DISPONIBILITES).ascending('disponibilite').limit(200).find({ suppressAuth: true }),
     wixData.query(COL_ORG_TYPES).ascending('type').limit(200).find({ suppressAuth: true }),
   ]);
@@ -157,6 +152,24 @@ async function options(statutIds) {
 }
 
 const GENRES_ORGANISME = ['Accueillant', 'Partenaire'];
+
+/**
+ * Statuts déduits des capacités cochées (règle de Bruno, 08/10). Détection sur des radicaux sans accents :
+ *   Écrire des cartes, Transporter / accompagner -> Porteur ; Proposer un lieu -> Partenaire ;
+ *   Accueillir des Porteurs de chaleur -> Accueillant ;
+ *   Lecture de cartes, Proposer ou animer une activité, Partager un talent -> Porteur, SAUF si « Accueillir » est coché (alors Accueillant).
+ */
+function statutsDepuisCapacites(labels) {
+  const ls = asArr(labels).map(sansAccents);
+  const a = (mot) => ls.some((l) => l.includes(mot));
+  const accueille = a('accueillir');
+  const out = new Set();
+  if (a('ecrire') || a('transporter')) out.add('Porteur');
+  if (a('lieu')) out.add('Partenaire');
+  if (accueille) out.add('Accueillant');
+  if (a('lecture') || a('activite') || a('talent')) out.add(accueille ? 'Accueillant' : 'Porteur');
+  return Array.from(out);
+}
 
 /** Types d'organisme des deux genres : la page « Mon organisme » est commune aux deux rôles. */
 function typesOrganisme(types) {
@@ -308,6 +321,21 @@ export const enregistrerMonProfil = webMethod(Permissions.SiteMember, async (pay
   if (fourni('capacites')) {
     const capIds = await labelsToIds(COL_CAPACITES, 'capacite', payload.capacites);
     await wixData.replaceReferences(COL_MEMBRES, 'capacites', rowId, capIds, { suppressAuth: true });
+
+    // Statuts déduits des capacités : ils s'AJOUTENT aux statuts existants, jamais retirés (règle des statuts)
+    try {
+      const voulus = statutsDepuisCapacites(payload.capacites);
+      if (voulus.length) {
+        const statutsRows = (await wixData.query(COL_STATUTS).limit(50).find({ suppressAuth: true })).items;
+        const ajoutIds = voulus.map((v) => (statutsRows.find((x) => norm(x.statut) === norm(v)) || {})._id).filter(Boolean);
+        const avant = idsOf(row.type);
+        const final = Array.from(new Set([...avant, ...ajoutIds]));
+        if (final.length !== avant.length) {
+          await wixData.replaceReferences(COL_MEMBRES, 'type', rowId, final, { suppressAuth: true });
+          console.log('[LPC][Profil] statuts déduits des capacités :', voulus.join(', '), '| avant :', avant.length, '| après :', final.length);
+        }
+      }
+    } catch (e) { console.warn('[LPC][Profil] statuts déduits KO :', e && (e.stack || e.message || e)); }
   }
   if (fourni('disponibilites')) {
     const dispoIds = await labelsToIds(COL_DISPONIBILITES, 'disponibilite', payload.disponibilites);
