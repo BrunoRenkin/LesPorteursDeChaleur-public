@@ -29,7 +29,7 @@ const EL = {
   photo: '#uploadButton1',              // Bouton de téléversement (photo de profil)
   consentementPhoto: '#checkbox1', // Case à cocher (consentement image)
   bouton: '#button15',               // Bouton (sans lien)
-  erreur: '#text112',                 // Texte affichant les messages d'erreur
+  erreur: '#errorTextAdminProfil',    // Texte des messages d'erreur (08/10 : renommé dans la section globale ; ancien #text112 en repli)
 };
 
 // Éléments FACULTATIFS : s'ils n'existent pas sur la page, le formulaire fonctionne sans eux.
@@ -67,7 +67,7 @@ const DUREE_AIDE_MS = 4000;
 const PAGE_MERCI = '/merci?f=porteur';   // page de remerciement commune F1/F2/F3
 
 $w.onReady(async () => {
-  console.log('[LPC][F1] version du code : 2026-10-06-b (ID de la section globale ; traces photo ; #btnorganisation replié)');
+  console.log('[LPC][F1] version du code : 2026-10-08-a (ID de la section globale ; traces photo ; #btnorganisation replié)');
   // Masquer l'erreur AVANT tout appel reseau (sinon elle reste visible si la suite echoue)
   safe('masquage erreur', hideErr);
   safe('controle des ID', checkIds);
@@ -405,7 +405,7 @@ function escapeHtml(s) {
 }
 /** Le paragraphe du message, ou null s'il est introuvable (aucune exception propagée). */
 function elErreur() {
-  try { const e = $w(EL.erreur); return e && typeof e.type === 'string' ? e : null; }
+  try { const e = $w(EL.erreur); if (e && typeof e.type === 'string') return e; const a = $w('#text112'); return a && typeof a.type === 'string' ? a : null; }
   catch (err) { return null; }
 }
 function showErr(msg, couleur) {

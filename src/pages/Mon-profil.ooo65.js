@@ -33,7 +33,7 @@ const EL = {
   photo: '#uploadButton1',
   consentementPhoto: '#checkbox1',
   bouton: '#button15',
-  erreur: '#text112',
+  erreur: '#errorTextAdminProfil',   // 08/10 : paragraphe d'erreur de la section globale, renommé (ancien #text112 gardé en repli)
 };
 // Éléments facultatifs : photo déjà enregistrée
 const EL_OPT = {
@@ -92,7 +92,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-a (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-b (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -474,7 +474,7 @@ function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-function elErreur() { return optionnel(EL.erreur); }
+function elErreur() { return optionnel(EL.erreur) || optionnel('#text112'); }
 function showErr(msg, couleur) {
   console.warn('[LPC][Profil] message :', msg);
   const e = elErreur();
