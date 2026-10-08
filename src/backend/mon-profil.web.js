@@ -25,7 +25,7 @@ const updateMember = elevate(members.updateMember);   // « Manage Members »
  *   Seul changement : `nbResidentsMax` est désormais MODIFIABLE ici comme dans F1 (voir enregistrerMonProfil).
  */
 
-const VERSION = '2026-10-06-a';
+const VERSION = '2026-10-08-a';
 const SITE_ID = 'REDACTED-WIX-SITE-ID';
 
 const COL_MEMBRES = 'Membres';
@@ -127,10 +127,17 @@ async function ficheCourante() {
 
 /** Options proposées, calculées d'après les STATUTS du membre. */
 async function options(statutIds) {
+  // Membre SANS statut (08/10, option C) : plus de repli sur toutes les capacités ; on ne propose que celles des
+  // statuts Accueillant et Partenaire (dont « Proposer un lieu »), pour que le statut vienne de la création d'organisation.
+  let idsCaps = statutIds;
+  if (!idsCaps.length) {
+    const sts = (await wixData.query(COL_STATUTS).limit(50).find({ suppressAuth: true })).items;
+    idsCaps = sts.filter((s) => GENRES_ORGANISME.some((g) => norm(g) === norm(s.statut))).map((s) => s._id);
+  }
   const [caps, dispos, types] = await Promise.all([
-    statutIds.length
-      ? wixData.query(COL_CAPACITES).hasSome('typesDeMembre', statutIds).ascending('capacite').limit(200).find({ suppressAuth: true })
-      : wixData.query(COL_CAPACITES).ascending('capacite').limit(200).find({ suppressAuth: true }),
+    idsCaps.length
+      ? wixData.query(COL_CAPACITES).hasSome('typesDeMembre', idsCaps).ascending('capacite').limit(200).find({ suppressAuth: true })
+      : Promise.resolve({ items: [] }),
     wixData.query(COL_DISPONIBILITES).ascending('disponibilite').limit(200).find({ suppressAuth: true }),
     wixData.query(COL_ORG_TYPES).ascending('type').limit(200).find({ suppressAuth: true }),
   ]);
