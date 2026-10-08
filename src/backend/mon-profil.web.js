@@ -25,7 +25,7 @@ const updateMember = elevate(members.updateMember);   // « Manage Members »
  *   Seul changement : `nbResidentsMax` est désormais MODIFIABLE ici comme dans F1 (voir enregistrerMonProfil).
  */
 
-const VERSION = '2026-10-08-b';
+const VERSION = '2026-10-08-c';
 const SITE_ID = 'REDACTED-WIX-SITE-ID';
 
 const COL_MEMBRES = 'Membres';
@@ -184,6 +184,26 @@ async function statutsDuMembre(row) {
   return { ids, labels: rows.map((r) => r.statut).filter(Boolean) };
 }
 
+/**
+ * Jumelages EN COURS d'un porteur (08/10) : prénom + initiale, organisme, centres d'intérêt de chaque résident.
+ * JAMAIS `infosimportantes` (données de santé) ni la chambre. Résidents inactifs écartés.
+ */
+async function jumelagesDuPorteur(porteurId) {
+  const jums = (await wixData.query('Jumelages').eq('porteur', porteurId).hasSome('statut', ['propose', 'actif']).limit(200).find({ suppressAuth: true })).items;
+  const resIds = [...new Set(jums.flatMap((j) => idsOf(j.resident)))];
+  if (!resIds.length) return { encours: 0, liste: [] };
+  const residents = (await wixData.query('Residents').hasSome('_id', resIds).limit(200).find({ suppressAuth: true })).items.filter((r) => r.actif !== false);
+  const orgIds = [...new Set(residents.flatMap((r) => idsOf(r.organisation_id)))];
+  const orgs = orgIds.length ? (await wixData.query(COL_ORGS).hasSome('_id', orgIds).limit(200).find({ suppressAuth: true })).items : [];
+  const orgPar = new Map(orgs.map((o) => [o._id, o.nom || '']));
+  const liste = residents.map((r) => ({
+    nom: (`${r.prenom || ''} ${r.nom ? r.nom + '.' : ''}`.trim()) || '(sans nom)',
+    organisme: orgPar.get(idsOf(r.organisation_id)[0]) || '',
+    interets: clean(String(r.interets || '').replace(/\s+/g, ' '), 120),
+  })).sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
+  return { encours: liste.length, liste };
+}
+
 export const getMonProfil = webMethod(Permissions.SiteMember, async () => {
   const { email, row } = await ficheCourante();
   if (!email) return { existe: false };
@@ -254,10 +274,16 @@ export const getMonProfil = webMethod(Permissions.SiteMember, async () => {
     }
   }
 
+  let jumelages = { encours: 0, liste: [] };
+  if (statuts.labels.some((l) => norm(l) === 'porteur')) {
+    try { jumelages = await jumelagesDuPorteur(row._id); } catch (e) { console.warn('[LPC][Profil] jumelages du porteur KO :', e && e.message); }
+  }
+
   return {
     existe: true,
     profil,
     organisation,
+    jumelages,
     capaciteOptions: caps.map((r) => r.capacite).filter(Boolean),
     capaciteOptionsOrganisme,
     disponibiliteOptions: dispos.map((r) => r.disponibilite).filter(Boolean),

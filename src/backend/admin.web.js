@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-07-b';
+const VERSION = '2026-10-08-a';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -430,16 +430,18 @@ export const adminFicheCourante = webMethod(Permissions.SiteMember, async () => 
   const maxCartes = Number(row.nbResidentsMax) || 0;
   let jumelagesEnCours = 0;
   let listeJumelages = [];   // 06/10 : jumelages en cours du porteur (prénom + initiale, organisme), affichés dans #boxResidents de /adminprofil
-  if (ecrit(row.capacites) && maxCartes >= 1) {
+  const statutsFiche = asArr(row.type).map((s) => s && s.statut).filter(Boolean);
+  const estPorteur = statutsFiche.some((s) => norm(s) === 'porteur');   // 08/10 : un porteur sans nombre de cartes peut aussi avoir des jumelages
+  if ((ecrit(row.capacites) && maxCartes >= 1) || estPorteur) {
     try {
       const jums = (await wixData.query('Jumelages').eq('porteur', row._id).hasSome('statut', ['propose', 'actif']).limit(LIMITE).find({ suppressAuth: true })).items;
       jumelagesEnCours = jums.length;
       const resIds = [...new Set(jums.flatMap((j) => idsOf(j.resident)))];
-      const residents = resIds.length ? (await wixData.query('Residents').hasSome('_id', resIds).limit(LIMITE).find({ suppressAuth: true })).items : [];
+      const residents = resIds.length ? (await wixData.query('Residents').hasSome('_id', resIds).limit(LIMITE).find({ suppressAuth: true })).items.filter((r) => r.actif !== false) : [];
       const orgIds = [...new Set(residents.flatMap((r) => idsOf(r.organisation_id)))];
       const orgs = orgIds.length ? (await wixData.query('Organisations').hasSome('_id', orgIds).limit(LIMITE).find({ suppressAuth: true })).items : [];
       const orgPar = new Map(orgs.map((o) => [o._id, o.nom || '']));
-      listeJumelages = residents.map((r) => ({ nom: nomResident(r), organisme: orgPar.get(idsOf(r.organisation_id)[0]) || '' }))
+      listeJumelages = residents.map((r) => ({ nom: nomResident(r), organisme: orgPar.get(idsOf(r.organisation_id)[0]) || '', interets: clean(String(r.interets || '').replace(/\s+/g, ' '), 120) }))
         .sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
     } catch (e) { jumelagesEnCours = 0; listeJumelages = []; }
   }
@@ -448,7 +450,8 @@ export const adminFicheCourante = webMethod(Permissions.SiteMember, async () => 
     version: VERSION,
     ticket: t._id,
     expire: t.expire,
-    jumelages: { encours: jumelagesEnCours, max: maxCartes, liste: listeJumelages },   // pas de données de santé : nom, initiale, organisme
+    jumelages: { encours: jumelagesEnCours, max: maxCartes, liste: listeJumelages },   // pas de données de santé : nom, initiale, organisme, centres d'intérêt
+    statutOptions: statutsFiche.length ? [] : STATUTS_CREATION.slice(),   // 08/10 : membre SANS statut -> #dropdownStatut de /adminprofil (l'admin le définit)
     emailPorteurPossible: maxCartes >= 1 && ecrit(row.capacites) && jumelagesEnCours >= maxCartes && Boolean(row.email),
     organisation: org ? { nom: org.nom || '(sans nom)' } : null,   // lien vers sa fiche : adminOuvrirOrganismeDuMembre
     profil: {
@@ -524,6 +527,16 @@ export const adminEnregistrerMembre = webMethod(Permissions.SiteMember, async (p
   await wixData.replaceReferences('Membres', 'capacites', rowId, capIds, { suppressAuth: true });
   await wixData.replaceReferences('Membres', 'disponibilites', rowId, dispoIds, { suppressAuth: true });
 
+  // Statut (08/10) : l'admin ne peut le DÉFINIR que pour un membre qui n'en a aucun (les statuts ne se modifient pas ensuite ici)
+  let statutAttribue = '';
+  if (payload.statut && !idsOf(row.type).length) {
+    const st = (await statutsDeCreation()).find((x) => norm(x.statut) === norm(payload.statut));
+    if (st) {
+      await wixData.replaceReferences('Membres', 'type', rowId, [st._id], { suppressAuth: true });
+      statutAttribue = st.statut;
+    } else console.warn('[LPC][Admin] statut refusé (inconnu ou hors liste) :', String(payload.statut).slice(0, 40));
+  }
+
   // Push vers le compte Wix du membre visé (jamais celui de l'administrateur)
   let pushWix = false;
   let photoWix = 'sans-objet';   // 'ok' | 'restante' (retrait refusé par Wix) | 'absente' (ajout non vu) | 'non-poussee' | 'non-verifiee' | 'sans-compte'
@@ -572,6 +585,7 @@ export const adminEnregistrerMembre = webMethod(Permissions.SiteMember, async (p
   await journaliser(admin, 'modifier:membres', rowId,
     'champs : prenom, nom, telephone, localite, commentaire, capacites, disponibilites, nbResidentsMax, consentement_photo'
     + (typeof payload.consentementPhoto === 'boolean' ? ' (' + (row.consentement_photo === true) + ' -> ' + payload.consentementPhoto + ')' : '')
+    + (statutAttribue ? ' · statut défini par l’administrateur : ' + statutAttribue : '')
     + (photoUrl ? ' · photo : ajoutée ou remplacée' : supprimerPhoto ? ' · photo : retirée (consentement image remis à faux)' : '')
     + ' · push Wix : ' + pushWix + (photoUrl || supprimerPhoto ? ' · photo Wix : ' + photoWix : ''));
   return { ok: true, version: VERSION, pushWix, photoWix, nbResidentsMax: p.nbResidentsMax == null ? null : p.nbResidentsMax };

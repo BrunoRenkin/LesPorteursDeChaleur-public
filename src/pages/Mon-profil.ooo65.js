@@ -46,6 +46,10 @@ const EL_OPT = {
 const BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];
 // Box des jumelages (#boxResidents et son contenu) : réservée à /adminprofil, replie ici (elle fait partie de la section globale)
 const BOX_ADMIN = ['#boxResidents', '#BoxResidents'];
+// 08/10 : la box est AFFICHÉE ici pour un porteur qui a des jumelages (titre + liste) ; ses boutons restent réservés à /adminprofil
+const IDS_TITRE_JUM = ['#titreJumelages', '#TitreJumelages'];
+const IDS_TEXTE_JUM = ['#textjumelage', '#textJumelage', '#textJumelages'];
+const IDS_BOUTONS_ADMIN = ['#buttonJumelages', '#BtnJumelage', '#buttonSendToPorteur'];
 const PAGE_ORGANISME = '/mon-organisme';
 const CAPACITE_LIEU = 'proposer un lieu';
 const NB_RESIDENTS = ['#input6', '#nbResidentsMax'];
@@ -88,7 +92,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-06-b (formulaire générique, mode profil ; traces photo ; bouton organisation)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-a (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -180,6 +184,7 @@ function remplir() {
     setVal(EL.commentaire, p.commentaire);
   });
   poserEmail(p.email).catch((e) => console.error('[LPC][Profil] e-mail (lecture seule) KO:', e));
+  safe('jumelages du porteur', afficherJumelages);
   safe('options capacites', () => {
     $w(EL.capacites).options = (d.capaciteOptions || []).map((v) => ({ label: v, value: v }));
     setVal(EL.capacites, p.capacites);
@@ -231,6 +236,30 @@ function remplir() {
       }
     });
   });
+}
+
+// ─── jumelages du porteur (08/10) ────────────────────────────────────────
+// Visible seulement si le membre est PORTEUR et a au moins un résident jumelé (le serveur ne renvoie la liste qu'à un porteur).
+// #titreJumelages = « Jumelage(s) : N » ; #textjumelage = liste numérotée « Prénom I., Organisme, centres d'intérêt ». Aucune donnée de santé.
+function afficherJumelages() {
+  IDS_BOUTONS_ADMIN.forEach((id) => cacher(optionnel(id)));   // boutons réservés à l'admin
+  const j = d.jumelages || { encours: 0, liste: [] };
+  const liste = j.liste || [];
+  const box = premier(BOX_ADMIN);
+  const porteur = ((d.profil || {}).statuts || []).some((s) => normTxt(s) === 'porteur');
+  if (!porteur || !liste.length) { cacher(box); return; }
+  montrer(box);
+  const titre = premier(IDS_TITRE_JUM);
+  if (titre) { try { titre.text = 'Jumelage(s) : ' + liste.length; montrer(titre); } catch (e) { console.error('[LPC][Profil] titre des jumelages KO :', e); } }
+  else console.warn('[LPC][Profil] #titreJumelages introuvable');
+  const texte = premier(IDS_TEXTE_JUM);
+  if (!texte) { console.warn('[LPC][Profil] #textjumelage introuvable'); return; }
+  const lignes = liste.map((x, i) => (i + 1) + '. ' + [x.nom, x.organisme, x.interets].filter(Boolean).join(', '));
+  try {
+    if (texte.html !== undefined) texte.html = lignes.map((l) => '<p class="font_8" style="margin:0;">' + escapeHtml(l) + '</p>').join('');
+    else texte.text = lignes.join(String.fromCharCode(10));
+    montrer(texte);
+  } catch (e) { console.error('[LPC][Profil] liste des jumelages KO :', e); }
 }
 
 // ─── e-mail (lecture seule) ──────────────────────────────────────────────

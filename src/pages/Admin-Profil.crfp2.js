@@ -106,11 +106,12 @@ let aPhoto = false;   // le membre a une photo enregistrée (sinon la case de co
 let photoASupprimer = false;   // retrait demandé, appliqué à l'enregistrement
 let rangeeConsentement = null;   // rangée de la case de consentement image, repliée tant qu'il n'y a ni photo ni fichier choisi
 let ticket = '';
+let statutPropose = false;   // 08/10 : #dropdownStatut affiché en modification (membre SANS statut) : sa valeur est envoyée à l'enregistrement
 let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-07-b', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-a', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -322,6 +323,7 @@ function remplir() {
   });
   safe('lien vers l’organisme', lienOrganisme);
   safe('bouton de jumelage', boutonJumelage);
+  safe('statut à définir', statutADefinir);
   safe('bouton e-mail au porteur', boutonEmail);
   safe('consentement RGPD grisé', griserRgpd);
   safe('profil', () => {
@@ -493,24 +495,27 @@ function boutonJumelage() {
   if (!boutons.length) console.warn('[LPC][AdminProfil] #buttonJumelages / #BtnJumelage introuvables');
   if (!box) console.warn('[LPC][AdminProfil] #boxResidents introuvable');
   const p = d.profil || {};
-  // Visible pour un PORTEUR seulement : « Écrire des cartes » enregistré ET nombre de cartes indiqué. Un accueillant n'a pas de
-  // jumelages ici : ses résidents se jumellent depuis /adminorganisme. Le serveur recontrôle.
-  const porteur = ecritDesCartes(p.capacites) && nombreDe(p.nbResidentsMax);
-  if (!porteur) { boutons.forEach(cacher); cacher(box); return; }
+  // Box visible pour un PORTEUR : « Écrire des cartes » enregistré ET nombre de cartes indiqué (peut jumeler : boutons affichés, le serveur
+  // recontrôle), ou statut Porteur avec au moins un jumelage (08/10 : liste seule). Un accueillant n'a pas de jumelages ici : ses
+  // résidents se jumellent depuis /adminorganisme.
+  const peutJumeler = ecritDesCartes(p.capacites) && nombreDe(p.nbResidentsMax);
+  const statutPorteur = (p.statuts || []).some((s) => String(s).toLowerCase() === 'porteur');
+  const aDesJumelages = statutPorteur && ((d.jumelages || {}).liste || []).length > 0;
+  if (!peutJumeler && !aDesJumelages) { boutons.forEach(cacher); cacher(box); return; }
   montrer(box);
-  boutons.forEach((b) => { montrer(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); });
+  boutons.forEach((b) => { if (peutJumeler) { montrer(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
   afficherJumelages();
 }
-/** #titreJumelages = « Jumelages : X/Y » (X jumelages en cours, Y cartes à écrire) ; #textjumelage = liste numérotée « Prénom I., Organisme »,
- *  ou « Pas de jumelage en cours ». Noms et organismes seulement : aucune donnée de santé ni chambre. */
+/** #titreJumelages = « Jumelage(s) : X/Y » (X jumelages en cours, Y cartes à écrire ; « X » seul si Y inconnu) ; #textjumelage = liste numérotée
+ *  « Prénom I., Organisme, centres d'intérêt », ou « Pas de jumelage en cours ». Aucune donnée de santé ni chambre. */
 function afficherJumelages() {
   const j = d.jumelages || { encours: 0, max: 0, liste: [] };
   const titre = premier(IDS_TITRE_JUMELAGES);
-  if (titre) { try { titre.text = 'Jumelages : ' + (Number(j.encours) || 0) + '/' + (Number(j.max) || 0); montrer(titre); } catch (e) { console.error('[LPC][AdminProfil] titre des jumelages KO :', e); } }
+  if (titre) { try { titre.text = 'Jumelage(s) : ' + (Number(j.encours) || 0) + (Number(j.max) > 0 ? '/' + Number(j.max) : ''); montrer(titre); } catch (e) { console.error('[LPC][AdminProfil] titre des jumelages KO :', e); } }
   else console.warn('[LPC][AdminProfil] #titreJumelages introuvable');
   const texte = premier(IDS_TEXTE_JUMELAGES);
   if (!texte) { console.warn('[LPC][AdminProfil] #textjumelage introuvable'); return; }
-  const lignes = (j.liste || []).map((x, i) => (i + 1) + '. ' + [x.nom, x.organisme].filter(Boolean).join(', '));
+  const lignes = (j.liste || []).map((x, i) => (i + 1) + '. ' + [x.nom, x.organisme, x.interets].filter(Boolean).join(', '));
   try {
     if (texte.html !== undefined) texte.html = lignes.length
       ? lignes.map((l) => '<p class="font_8" style="margin:0;">' + escapeHtml(l) + '</p>').join('')
@@ -518,6 +523,21 @@ function afficherJumelages() {
     else texte.text = lignes.length ? lignes.join(String.fromCharCode(10)) : 'Pas de jumelage en cours';
     montrer(texte);
   } catch (e) { console.error('[LPC][AdminProfil] liste des jumelages KO :', e); }
+}
+// ─── statut d'un membre qui n'en a pas (08/10) ───────────────────────────
+// #dropdownStatut (élément de la PAGE, replié par défaut) apparaît seulement pour un membre SANS statut : l'admin le définit, il est
+// envoyé à l'enregistrement. Le serveur ne l'accepte que si le membre n'a toujours aucun statut.
+function statutADefinir() {
+  const p = d.profil || {};
+  const options = d.statutOptions || [];
+  if ((p.statuts || []).length || !options.length) return;
+  const l = optionnel(IDS_STATUT.liste);
+  if (!l) { console.warn('[LPC][AdminProfil] ' + IDS_STATUT.liste + ' introuvable : membre sans statut, impossible de le définir'); return; }
+  l.options = options.map((v) => ({ label: v, value: v }));
+  l.value = '';
+  montrer(l); montrer(optionnel(IDS_STATUT.titre));
+  statutPropose = true;
+  console.log('[LPC][AdminProfil] membre sans statut : liste des statuts affichée');
 }
 async function ouvrirJumelage() {
   hideErr();
@@ -793,6 +813,7 @@ async function sauver() {
       photoH: photo ? photo.h : undefined,
       supprimerPhoto: photoASupprimer && !photo ? true : undefined,
       nbResidentsMax: nbSaisissable() ? (nombreDe(champNbResidents().value) || undefined) : undefined,
+      statut: statutPropose ? (String(valeur(IDS_STATUT.liste) || '') || undefined) : undefined,
     });
     console.log('[LPC][AdminProfil] enregistrement', res);
     if (res && res.refuse) { wixLocation.to('/'); return; }
