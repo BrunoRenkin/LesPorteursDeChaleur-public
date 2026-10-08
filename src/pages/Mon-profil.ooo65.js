@@ -94,13 +94,13 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-c (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-d (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
   // Onglets, consentement RGPD, champ « nombre de cartes » masqués d'emblée, avant tout appel serveur
   safe('masquage initial', () => {
-    cacher(pileOnglets()); cacher(boiteOnglets()); cacher(optionnel(EL_ONGLETS.ongletResidents));
+    cacher(pileOnglets()); cacher(boiteOnglets()); cacher(boutonResidents());
     cacher(optionnel(EL.consentement));
     cacher(premier(BOX_ADMIN));          // box des jumelages : admin seulement
     cacher(premier(BTN_ORGANISATION));   // réaffiché par majBoutonOrganisation() si « Proposer un lieu » est coché
@@ -149,7 +149,7 @@ function ongletsVisibles(profil, organisation) {
     const onglet = optionnel(EL_ONGLETS.ongletOrganisme);
     if (afficher) montrer(onglet); else cacher(onglet);
   }
-  const ongletRes = optionnel(EL_ONGLETS.ongletResidents);
+  const ongletRes = boutonResidents();
   if (ongletRes) {
     peindre(ongletRes, ONGLET_INACTIF);
     const accueillant = statuts.some((s) => normTxt(s) === normTxt(STATUT_RESIDENTS));
@@ -160,6 +160,14 @@ function ongletsVisibles(profil, organisation) {
   if (aUnStatut && !aUneOrganisation) {
     console.log('[LPC][Profil] statut Accueillant/Partenaire sans organisation liée : #btnorganisation permet d’en créer une');
   }
+}
+/** Bouton « Résidents » : #ongletResidents, sinon #button10 (ID réel sur cette page dupliquée, comme sur /mon-organisme), sinon le premier bouton libellé « Résidents ».
+ *  Réservé à un Accueillant AVEC organisation liée (08/10) : sans lui, il restait affiché dès que la boîte d'onglets était visible. */
+function boutonResidents() {
+  for (const id of ['#ongletResidents', '#button10']) { const el = optionnel(id); if (el) return el; }
+  let trouve = null;
+  try { $w('Button').forEach((b) => { if (!trouve && normTxt(b.label) === 'résidents') trouve = b; }); } catch (e) { /* ignoré */ }
+  return trouve;
 }
 function boiteOnglets() { return premier(BOITE_ONGLETS); }
 function pileOnglets() { return premier(PILE_ONGLETS); }
@@ -461,9 +469,15 @@ async function sauver() {
     if (res && res.ok) {
       if (photoUrl || photoASupprimer) tracer('enregistre', 'info', { photo: photoUrl ? 'ajout' : 'retrait', versionServeur: res.version });
       photoASupprimer = false;
-      const accueillantSansOrg = Array.isArray(res.statuts) && res.statuts.some((s) => normTxt(s) === normTxt(STATUT_RESIDENTS)) && res.organisation === false;
-      const cible = accueillantSansOrg ? PAGE_F2 : PAGE_MERCI;
-      console.log('[LPC][Profil] redirection vers', cible, '| statuts :', (res.statuts || []).join(', '), '| organisation :', res.organisation);
+      // Statuts et organisation après l'enregistrement : réponse du serveur (-d) ; à défaut (serveur plus ancien), repli sur les données
+      // chargées + la case « Accueillir » cochée
+      const statutsApres = Array.isArray(res.statuts) ? res.statuts : ((d.profil || {}).statuts || []);
+      const accueille = statutsApres.some((s) => normTxt(s) === normTxt(STATUT_RESIDENTS))
+        || (valeur(EL.capacites) || []).some((l) => normTxt(String(l).normalize('NFD').replace(/[̀-ͯ]/g, '')).includes('accueillir'));
+      const aOrganisation = typeof res.organisation === 'boolean' ? res.organisation : Boolean(d.organisation);
+      const cible = accueille && !aOrganisation ? PAGE_F2 : PAGE_MERCI;
+      console.log('[LPC][Profil] redirection vers', cible, '| statuts :', statutsApres.join(', '), '| accueil :', accueille,
+        '| organisation :', aOrganisation, '| source :', Array.isArray(res.statuts) ? 'serveur ' + res.version : 'page (serveur ancien ?) ' + res.version);
       wixLocation.to(cible);
       return;
     }
