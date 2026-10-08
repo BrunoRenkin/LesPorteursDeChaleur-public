@@ -9,6 +9,26 @@
 import { authentication } from 'wix-members-frontend';
 import { syncCurrentMemberToCollection } from 'backend/members-sync.web';
 import { estAdmin } from 'backend/admin.web';
+import wixLocation from 'wix-location-frontend';
+
+// Version du code global (estampille, console : [LPC][MP]).
+const VERSION_MP = '2026-10-08-a';
+
+// Redirection après connexion (Bruno, 08/10) : un membre qui se connecte depuis une page PUBLIQUE
+// (accueil, pages d'information, pages /auth/* de réinitialisation du mot de passe) arrive sur /mon-profil.
+// On ne détourne JAMAIS une connexion faite sur une page qui a son propre parcours : /participer et ses
+// formulaires (F1, F2, F3), les pages membres, /merci et le back-office. Comparaison sur le 1er segment de l'adresse.
+const PAGE_APRES_CONNEXION = '/mon-profil';
+const PREFIXES_SANS_REDIRECTION = [
+  'participer', 'devenir-', 'accueillir-', 'mon-', 'mes-residents', 'merci', 'admin'
+];
+function redirectionApresConnexionPermise() {
+  let segment = '';
+  try { segment = String((wixLocation.path && wixLocation.path[0]) || '').toLowerCase(); } catch (e) { return false; }
+  const exclue = PREFIXES_SANS_REDIRECTION.some((p) => segment === p || segment.indexOf(p) === 0);
+  console.log('[LPC][MP] redirection après connexion : page « /' + segment + ' » ' + (exclue ? 'exclue' : 'autorisée'));
+  return !exclue;
+}
 
 // Lien « Admin » de l'en-tête : masqué par défaut, affiché pour les seuls admins.
 // Confort d'affichage uniquement : /admin et ses web methods se protègent seuls.
@@ -29,6 +49,7 @@ async function majLienAdmin() {
 }
 
 $w.onReady(() => {
+  console.log('[LPC][MP] version du code global :', VERSION_MP, '· chemin :', (wixLocation.path || []).join('/'));
   majLienAdmin();
   authentication.onLogin(async () => {
     majLienAdmin();
@@ -38,5 +59,7 @@ $w.onReady(() => {
     } catch (e) {
       console.error('[LPC] onLogin sync KO:', e);
     }
+    // Redirection après la synchro (la fiche existe) ; jamais depuis une page à parcours propre.
+    if (redirectionApresConnexionPermise()) wixLocation.to(PAGE_APRES_CONNEXION);
   });
 });
