@@ -104,7 +104,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-k (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-l (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -272,12 +272,18 @@ function remplirTableau(liste) {
     try {
       const actuelles = Array.isArray(tab.columns) ? tab.columns : [];
       const cols = COLONNES_JUMELAGES.map((c, i) => Object.assign({}, actuelles[i] || {}, c));   // largeurs de l'éditeur conservées au départ
-      // 08/10 (Bruno) : 1re colonne (numéro, sans titre) inchangée ; les AUTRES colonnes ont la même largeur (même total que dans l'éditeur)
+      // 08/10 (Bruno) : 1re colonne (numéro, sans titre) inchangée ; les AUTRES colonnes sont dimensionnées d'après leur CONTENU (nom étroit,
+      // établissement plus large, centres d'intérêt le plus large), en gardant le même total que dans l'éditeur (unité du champ `width` conservée)
       const lg = (c) => Number(c && c.width);
       if (cols.length > 1 && cols.every((c) => lg(c) > 0)) {
         const total = cols.reduce((n, c) => n + lg(c), 0);
-        const egale = Math.round(((total - lg(cols[0])) / (cols.length - 1)) * 100) / 100;
-        cols.forEach((c, i) => { if (i > 0) c.width = egale; });
+        const disponible = total - lg(cols[0]);
+        const plusLong = (cle) => liste.reduce((m, x) => Math.max(m, String((cle === 'nom' ? x.nom : cle === 'etablissement' ? x.organisme : x.interets) || '').length), 0);
+        const borne = (v, mini, maxi) => Math.max(mini, Math.min(maxi, v));
+        const poids = [borne(plusLong('nom') + 2, 10, 18), borne(plusLong('etablissement') + 2, 14, 40), borne(plusLong('interets') + 2, 20, 90)];
+        const somme = poids.reduce((n, p) => n + p, 0);
+        cols.forEach((c, i) => { if (i > 0) c.width = Math.round((disponible * (poids[i - 1] || 1) / somme) * 100) / 100; });
+        console.log('[LPC] largeurs de #tableJumelage (d\'après le contenu) : ' + cols.map((c) => c.width).join(' / '));
       } else console.log('[LPC] largeurs de #tableJumelage non lisibles (champ width) : ' + JSON.stringify(actuelles.map((c) => c && c.width)));
       tab.columns = cols;
     } catch (e) {
