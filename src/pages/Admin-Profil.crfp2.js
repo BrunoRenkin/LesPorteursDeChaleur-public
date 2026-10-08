@@ -119,7 +119,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-g', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-h', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -517,8 +517,27 @@ function boutonJumelage() {
   if (!peutJumeler && !aDesJumelages) { boutons.forEach(cacher); cacher(box); return; }
   montrer(box); montrerParents(box);
   try { let x = box.parent; const ch = []; for (let i = 0; x && i < 5; i++) { ch.push(x.id + ':' + (x.hidden ? 'H' : '') + (x.collapsed ? 'C' : '')); x = x.parent; } console.log('[LPC][AdminProfil] box des jumelages : hidden =', box.hidden, '| collapsed =', box.collapsed, '| visible =', box.isVisible, '| parents :', ch.join(' > ')); } catch (e) { /* ignoré */ }
+  inventaireJumelages();
   boutons.forEach((b) => { if (peutJumeler) { montrer(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
   afficherJumelages();
+}
+/** Diagnostic (08/10) : état à l'exécution de tous les éléments dont l'ID évoque les jumelages ou les résidents (id, masqué, replié, visible, parent). */
+function inventaireJumelages() {
+  try {
+    const sortie = [];
+    ['Text', 'Button', 'Container', 'Box', 'Stack', 'Repeater', 'Image', 'Strip', 'Column'].forEach((type) => {
+      let els = null;
+      try { els = $w(type); } catch (e) { return; }
+      if (!els || typeof els.forEach !== 'function') return;
+      els.forEach((e) => {
+        const id = String((e && e.id) || '');
+        if (!/jum|resid|box185|admin/i.test(id)) return;
+        let p = null; try { p = e.parent; } catch (x) { p = null; }
+        sortie.push(type + ' #' + id + ' [' + (e.hidden ? 'H' : '') + (e.collapsed ? 'C' : '') + (e.isVisible ? 'V' : '-') + '] <' + (p ? p.id : '?') + '>');
+      });
+    });
+    console.log('[LPC][Inventaire] jumelages / résidents :', sortie.join(' | ') || 'aucun élément');
+  } catch (e) { console.warn('[LPC][Inventaire] KO :', e && e.message); }
 }
 let tableauCable = false;
 /** Tableau des jumelés = répéteur #repeaterJumelages (cellules de ligne : #jumNum, #jumResident, #jumOrganisme, #jumInterets). Renvoie false s'il est absent. */

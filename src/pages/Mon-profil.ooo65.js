@@ -96,7 +96,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-h (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-i (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -256,6 +256,24 @@ function remplir() {
 // ─── jumelages du porteur (08/10) ────────────────────────────────────────
 // Visible seulement si le membre est PORTEUR et a au moins un résident jumelé (le serveur ne renvoie la liste qu'à un porteur).
 // #titreJumelages = « Jumelage(s) : N » ; #textjumelage = liste numérotée « Prénom I., Organisme, centres d'intérêt ». Aucune donnée de santé.
+/** Diagnostic (08/10) : état à l'exécution de tous les éléments dont l'ID évoque les jumelages ou les résidents (id, masqué, replié, visible, parent). */
+function inventaireJumelages() {
+  try {
+    const sortie = [];
+    ['Text', 'Button', 'Container', 'Box', 'Stack', 'Repeater', 'Image', 'Strip', 'Column'].forEach((type) => {
+      let els = null;
+      try { els = $w(type); } catch (e) { return; }
+      if (!els || typeof els.forEach !== 'function') return;
+      els.forEach((e) => {
+        const id = String((e && e.id) || '');
+        if (!/jum|resid|box185|admin/i.test(id)) return;
+        let p = null; try { p = e.parent; } catch (x) { p = null; }
+        sortie.push(type + ' #' + id + ' [' + (e.hidden ? 'H' : '') + (e.collapsed ? 'C' : '') + (e.isVisible ? 'V' : '-') + '] <' + (p ? p.id : '?') + '>');
+      });
+    });
+    console.log('[LPC][Inventaire] jumelages / résidents :', sortie.join(' | ') || 'aucun élément');
+  } catch (e) { console.warn('[LPC][Inventaire] KO :', e && e.message); }
+}
 let tableauCable = false;
 /** Tableau des jumelés = répéteur #repeaterJumelages (cellules de ligne : #jumNum, #jumResident, #jumOrganisme, #jumInterets). Renvoie false s'il est absent. */
 function remplirTableau(liste) {
@@ -292,6 +310,7 @@ function afficherJumelages() {
   if (!porteur || !liste.length) { cacher(box); return; }
   montrer(box); montrerParents(box);
   try { let x = box.parent; const ch = []; for (let i = 0; x && i < 5; i++) { ch.push(x.id + ':' + (x.hidden ? 'H' : '') + (x.collapsed ? 'C' : '')); x = x.parent; } console.log('[LPC][Profil] box des jumelages : hidden =', box.hidden, '| collapsed =', box.collapsed, '| visible =', box.isVisible, '| parents :', ch.join(' > ')); } catch (e) { /* ignoré */ }
+  inventaireJumelages();
   const titre = premier(IDS_TITRE_JUM);
   // « Jumelages : 2/2 » : X jumelés, Y = nombre de cartes que le porteur a indiqué
   if (titre) { try { titre.text = titreJumelages(liste.length, (d.profil || {}).nbResidentsMax); montrer(titre); } catch (e) { console.error('[LPC][Profil] titre des jumelages KO :', e); } }
