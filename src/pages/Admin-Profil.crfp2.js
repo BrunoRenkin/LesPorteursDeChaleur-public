@@ -115,7 +115,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-d', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-e', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -224,7 +224,7 @@ async function initCreation() {
     if (!l) { console.warn('[LPC][AdminProfil] ' + IDS_STATUT.liste + ' introuvable : ajoutez la liste déroulante des statuts sur la page'); return; }
     l.options = (d.statuts || []).map((v) => ({ label: v, value: v }));
     l.value = '';
-    montrer(l); montrer(optionnel(IDS_STATUT.titre));
+    montrer(l); montrerParents(l); montrer(optionnel(IDS_STATUT.titre));   // 08/10 : le parent de la liste est masqué dans l'éditeur (box185)
     if (typeof l.onChange === 'function') l.onChange(() => majCapacitesCreation());
   });
   safe('options disponibilites', () => {
