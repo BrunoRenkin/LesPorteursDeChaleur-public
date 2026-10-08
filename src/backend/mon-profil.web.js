@@ -25,7 +25,7 @@ const updateMember = elevate(members.updateMember);   // « Manage Members »
  *   Seul changement : `nbResidentsMax` est désormais MODIFIABLE ici comme dans F1 (voir enregistrerMonProfil).
  */
 
-const VERSION = '2026-10-08-d';
+const VERSION = '2026-10-08-e';
 const SITE_ID = 'REDACTED-WIX-SITE-ID';
 
 const COL_MEMBRES = 'Membres';
@@ -182,6 +182,19 @@ async function statutsDuMembre(row) {
   if (!ids.length) return { ids: [], labels: [] };
   const rows = (await wixData.query(COL_STATUTS).hasSome('_id', ids).limit(20).find({ suppressAuth: true })).items;
   return { ids, labels: rows.map((r) => r.statut).filter(Boolean) };
+}
+
+/**
+ * Identifiant de l'organisation liée au membre SI ELLE EXISTE ENCORE, sinon null (08/10). `organisation_id` peut pointer vers une
+ * organisation supprimée (constaté sur un compte de test : lien orphelin) : il ne faut alors ni parler d'organisation liée, ni refuser d'en créer une.
+ */
+async function organisationExistante(row) {
+  const id = idsOf(row && row.organisation_id)[0];
+  if (!id) return null;
+  try {
+    const o = (await wixData.query(COL_ORGS).eq('_id', id).limit(1).find({ suppressAuth: true })).items[0];
+    return o ? id : null;
+  } catch (e) { return null; }
 }
 
 /**
@@ -402,7 +415,7 @@ export const enregistrerMonProfil = webMethod(Permissions.SiteMember, async (pay
 
   // `version` et `nbResidentsMax` renvoyés au navigateur : contrôle visible dans la console (26/09).
   return { ok: true, id: rowId, version: VERSION, nbResidentsMax: p.nbResidentsMax == null ? null : p.nbResidentsMax,
-    statuts: statutsFinaux, organisation: Boolean(idsOf(row.organisation_id)[0]) };
+    statuts: statutsFinaux, organisation: Boolean(await organisationExistante(row)) };
 });
 
 /**
@@ -473,7 +486,7 @@ export const creerMonOrganisation = webMethod(Permissions.SiteMember, async (pay
   const { email, row } = await ficheCourante();
   if (!email) return { ok: false, reason: 'not-logged-in' };
   if (!row) return { ok: false, reason: 'fiche-absente' };
-  if (idsOf(row.organisation_id)[0]) return { ok: false, reason: 'deja-organisation' };
+  if (await organisationExistante(row)) return { ok: false, reason: 'deja-organisation' };   // lien orphelin (organisation supprimée) : création permise
 
   const nom = clean(payload.nom, 200);
   if (!nom) return { ok: false, reason: 'nom-requis' };
