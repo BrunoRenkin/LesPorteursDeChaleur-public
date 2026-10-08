@@ -72,6 +72,8 @@ const STATUTS_ORGANISME = ['Accueillant', 'Partenaire'];
 const STATUT_RESIDENTS = 'Accueillant';
 
 const PAGE_MERCI = '/merci?f=porteur-mon-profil';
+// Un Accueillant (statut obtenu ici, par la capacité « Accueillir ») SANS organisation est envoyé au formulaire F2 pour décrire son lieu (08/10)
+const PAGE_F2 = '/accueillir-des-porteur-de-chaleur';
 const LIBELLE_BOUTON = 'Enregistrer';
 
 // Nombre de cartes : proposition d'harmonisation (30/09) = modifiable ici comme dans F1.
@@ -92,7 +94,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-b (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-c (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -136,14 +138,16 @@ function ongletsVisibles(profil, organisation) {
   const statuts = (profil && profil.statuts) || [];
   const aUnStatut = statuts.some((s) => STATUTS_ORGANISME.some((x) => normTxt(x) === normTxt(s)));
   const aUneOrganisation = Boolean(organisation);
+  // 08/10 : un Accueillant ou un Partenaire voit l'onglet Organisme même SANS organisation (il peut en créer une) ; Résidents : organisation requise
+  const afficher = aUneOrganisation || aUnStatut;
   const boite = boiteOnglets();
   const pile = pileOnglets();
   if (boite || pile) {
-    [pile, boite].forEach((el) => { if (!el) return; if (aUneOrganisation) montrer(el); else cacher(el); });
+    [pile, boite].forEach((el) => { if (!el) return; if (afficher) montrer(el); else cacher(el); });
   } else {
     console.warn("[LPC][Profil] boîte d'onglets introuvable (" + BOITE_ONGLETS.join(', ') + ')');
     const onglet = optionnel(EL_ONGLETS.ongletOrganisme);
-    if (aUneOrganisation) montrer(onglet); else cacher(onglet);
+    if (afficher) montrer(onglet); else cacher(onglet);
   }
   const ongletRes = optionnel(EL_ONGLETS.ongletResidents);
   if (ongletRes) {
@@ -151,10 +155,10 @@ function ongletsVisibles(profil, organisation) {
     const accueillant = statuts.some((s) => normTxt(s) === normTxt(STATUT_RESIDENTS));
     if (accueillant && aUneOrganisation) montrer(ongletRes); else cacher(ongletRes);
   }
-  console.log('[LPC][Profil] onglets', aUneOrganisation ? 'affichés' : 'masqués (aucune organisation liée)',
-    '| statuts :', statuts.join(', '));
+  console.log('[LPC][Profil] onglets', afficher ? 'affichés' : 'masqués (ni organisation liée, ni statut Accueillant / Partenaire)',
+    '| statuts :', statuts.join(', '), '| organisation :', aUneOrganisation);
   if (aUnStatut && !aUneOrganisation) {
-    console.warn('[LPC][Profil] statut Accueillant/Partenaire SANS organisation liée : fiche à vérifier');
+    console.log('[LPC][Profil] statut Accueillant/Partenaire sans organisation liée : #btnorganisation permet d’en créer une');
   }
 }
 function boiteOnglets() { return premier(BOITE_ONGLETS); }
@@ -289,7 +293,9 @@ let btnOrganisationCable = false;
 function majBoutonOrganisation() {
   const b = premier(BTN_ORGANISATION);
   if (!b) { console.warn('[LPC][Profil] bouton #btnorganisation introuvable'); return; }
-  if (!proposeUnLieu(valeur(EL.capacites))) { cacher(b); return; }
+  // 08/10 : aussi affiché pour tout Accueillant / Partenaire (créer ou modifier son organisme), même sans « Proposer un lieu »
+  const statutOrganisme = ((d.profil || {}).statuts || []).some((s) => STATUTS_ORGANISME.some((x) => normTxt(x) === normTxt(s)));
+  if (!proposeUnLieu(valeur(EL.capacites)) && !statutOrganisme) { cacher(b); return; }
   montrer(b);
   if (!btnOrganisationCable && typeof b.onClick === 'function') {
     btnOrganisationCable = true;
@@ -455,8 +461,10 @@ async function sauver() {
     if (res && res.ok) {
       if (photoUrl || photoASupprimer) tracer('enregistre', 'info', { photo: photoUrl ? 'ajout' : 'retrait', versionServeur: res.version });
       photoASupprimer = false;
-      console.log('[LPC][Profil] redirection vers', PAGE_MERCI);
-      wixLocation.to(PAGE_MERCI);
+      const accueillantSansOrg = Array.isArray(res.statuts) && res.statuts.some((s) => normTxt(s) === normTxt(STATUT_RESIDENTS)) && res.organisation === false;
+      const cible = accueillantSansOrg ? PAGE_F2 : PAGE_MERCI;
+      console.log('[LPC][Profil] redirection vers', cible, '| statuts :', (res.statuts || []).join(', '), '| organisation :', res.organisation);
+      wixLocation.to(cible);
       return;
     }
     tracer('enregistrement-refuse', 'error', { reponse: res && (res.reason || res.ok) });

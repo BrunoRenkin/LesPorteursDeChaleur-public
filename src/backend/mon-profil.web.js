@@ -25,7 +25,7 @@ const updateMember = elevate(members.updateMember);   // « Manage Members »
  *   Seul changement : `nbResidentsMax` est désormais MODIFIABLE ici comme dans F1 (voir enregistrerMonProfil).
  */
 
-const VERSION = '2026-10-08-c';
+const VERSION = '2026-10-08-d';
 const SITE_ID = 'REDACTED-WIX-SITE-ID';
 
 const COL_MEMBRES = 'Membres';
@@ -344,6 +344,7 @@ export const enregistrerMonProfil = webMethod(Permissions.SiteMember, async (pay
   delete p.type; delete p.capacites; delete p.disponibilites;   // statuts intacts, refs via replaceReferences
   const rowId = (await wixData.update(COL_MEMBRES, p, { suppressAuth: true }))._id;
 
+  let statutsFinaux = asArr(row.type).map((s) => s && s.statut).filter(Boolean);   // renvoyés à la page (redirection d'un Accueillant sans organisation)
   if (fourni('capacites')) {
     const capIds = await labelsToIds(COL_CAPACITES, 'capacite', payload.capacites);
     await wixData.replaceReferences(COL_MEMBRES, 'capacites', rowId, capIds, { suppressAuth: true });
@@ -356,6 +357,7 @@ export const enregistrerMonProfil = webMethod(Permissions.SiteMember, async (pay
         const ajoutIds = voulus.map((v) => (statutsRows.find((x) => norm(x.statut) === norm(v)) || {})._id).filter(Boolean);
         const avant = idsOf(row.type);
         const final = Array.from(new Set([...avant, ...ajoutIds]));
+        statutsFinaux = Array.from(new Set([...statutsFinaux, ...voulus]));
         if (final.length !== avant.length) {
           await wixData.replaceReferences(COL_MEMBRES, 'type', rowId, final, { suppressAuth: true });
           console.log('[LPC][Profil] statuts déduits des capacités :', voulus.join(', '), '| avant :', avant.length, '| après :', final.length);
@@ -399,7 +401,8 @@ export const enregistrerMonProfil = webMethod(Permissions.SiteMember, async (pay
   }
 
   // `version` et `nbResidentsMax` renvoyés au navigateur : contrôle visible dans la console (26/09).
-  return { ok: true, id: rowId, version: VERSION, nbResidentsMax: p.nbResidentsMax == null ? null : p.nbResidentsMax };
+  return { ok: true, id: rowId, version: VERSION, nbResidentsMax: p.nbResidentsMax == null ? null : p.nbResidentsMax,
+    statuts: statutsFinaux, organisation: Boolean(idsOf(row.organisation_id)[0]) };
 });
 
 /**
