@@ -25,7 +25,7 @@ import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
 import { adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix } from 'backend/admin.web';
 
-const VERSION = '2026-10-07-c';   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-08-a';   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -205,7 +205,7 @@ function remplirItem($item, d) {
   }
   safe('bouton Modifier', () => {
     const b = $item('#btnModifier');
-    if (b && 'label' in b) b.label = d.nonValide ? 'Valider' : (LIBELLE_BOUTON[onglet] || 'Modifier');   // compte Wix sans fiche : « Valider » crée la fiche
+    if (b && 'label' in b) b.label = d.nonValide ? 'Créer le profil' : (LIBELLE_BOUTON[onglet] || 'Modifier');   // compte Wix sans fiche : « Créer le profil » crée la fiche (renommé le 08/10, ex-« Valider »)
     if (b && typeof b.onClick === 'function') b.onClick(() => ouvrir(d));
     if (b && b.show) b.show();
     if (b && typeof b.onClick === 'function') return;
@@ -425,7 +425,7 @@ async function charger(nouvelOnglet) {
 // Aucun identifiant dans l'URL. `ligne.id` = identifiant réel de la fiche (`_id` porte un suffixe de rendu).
 // Membres, organismes et résidents (gestion des résidents de son organisme) sont gérés.
 let validationEnCours = false;
-/** « Valider » : crée la fiche LPC d'un compte Wix qui n'en a pas (aucun e-mail envoyé), puis recharge la liste. */
+/** « Créer le profil » (ex-« Valider ») : crée la fiche LPC d'un compte Wix qui n'en a pas (aucun e-mail envoyé, l'e-mail du compte n'est PAS vérifié par cette action), puis recharge la liste. */
 async function valider(ligne) {
   if (validationEnCours) return;
   validationEnCours = true;
@@ -439,11 +439,11 @@ async function valider(ligne) {
       setTxt('#messageErreur', 'Fiche créée. Prévenez la personne (e-mail manuel) : elle peut se connecter au site pour compléter son inscription.', '#1E8449');
     } else {
       setTxt('#messageErreur', res.reason === 'deja-synchronise' ? 'Ce membre a déjà une fiche : rechargez la page.'
-        : res.reason === 'introuvable' ? 'Compte Wix introuvable.' : 'La validation a échoué, merci de réessayer.', COULEUR_ERREUR);
+        : res.reason === 'introuvable' ? 'Compte Wix introuvable.' : 'La création du profil a échoué, merci de réessayer.', COULEUR_ERREUR);
     }
   } catch (e) {
     console.error('[LPC][Admin] adminValiderMembreWix KO:', e);
-    setTxt('#messageErreur', 'La validation a échoué, merci de réessayer.', COULEUR_ERREUR);
+    setTxt('#messageErreur', 'La création du profil a échoué, merci de réessayer.', COULEUR_ERREUR);
   } finally { validationEnCours = false; }
 }
 

@@ -65,7 +65,7 @@ const PAGE_ORGANISME = '/adminorganisme';
 const PAGE_RESIDENTS = '/adminjumelages';
 // 08/10 : la pile des jumelages de /adminprofil a ses PROPRES ID (préfixe « Admin », éléments de la page) ; ceux de la section globale
 // (#boxResidents…, partagés avec /mon-profil) restent en dernier repli et la box globale est repliée ici.
-const IDS_BTN_JUMELAGE = ['#AdminbuttonJumelages', '#AdminBtnJumelage', '#buttonJumelages', '#BtnJumelage'];   // ouvrent /adminjumelages sur ce porteur ; ceux qui existent sont câblés
+const IDS_BTN_JUMELAGE = ['#AdminbuttonJumelages', '#AdminBtnJumelage', '#button21', '#buttonJumelages', '#BtnJumelage'];   // #button21 : bouton « Jumelages » vu en console le 08/10 (nom automatique de la pile)   // ouvrent /adminjumelages sur ce porteur ; ceux qui existent sont câblés
 const IDS_BOX_RESIDENTS = ['#AdminboxResidents', '#boxResidents', '#BoxResidents'];
 const IDS_BOX_RESIDENTS_GLOBALE = ['#boxResidents', '#BoxResidents'];
 const IDS_TITRE_JUMELAGES = ['#AdmintitreJumelages', '#titreJumelages', '#TitreJumelages'];
@@ -115,7 +115,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-b', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-c', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -506,6 +506,10 @@ function boutonJumelage() {
   const peutJumeler = ecritDesCartes(p.capacites) && nombreDe(p.nbResidentsMax);
   const statutPorteur = (p.statuts || []).some((s) => String(s).toLowerCase() === 'porteur');
   const aDesJumelages = statutPorteur && ((d.jumelages || {}).liste || []).length > 0;
+  console.log('[LPC][AdminProfil] jumelages : statut Porteur =', statutPorteur, '| peut jumeler (écrit des cartes + nombre) =', Boolean(peutJumeler),
+    '| jumelés reçus :', ((d.jumelages || {}).liste || []).length, '| box :', box ? box.id : 'introuvable',
+    '| titre :', (premier(IDS_TITRE_JUMELAGES) || {}).id || 'introuvable', '| texte :', (premier(IDS_TEXTE_JUMELAGES) || {}).id || 'introuvable',
+    '| boutons :', boutons.map((b) => b.id).join(', ') || 'aucun');
   if (!peutJumeler && !aDesJumelages) { boutons.forEach(cacher); cacher(box); return; }
   montrer(box);
   boutons.forEach((b) => { if (peutJumeler) { montrer(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
@@ -547,6 +551,14 @@ function statutADefinir() {
   montrer(l); montrer(optionnel(IDS_STATUT.titre));
   statutPropose = true;
   console.log('[LPC][AdminProfil] membre sans statut : liste des statuts affichée');
+  // Diagnostic : « affichée » côté code ne garantit pas qu'elle soit visible (parent replié ou masqué dans l'éditeur ?)
+  try {
+    const etat = (e) => (e ? { id: e.id, hidden: e.hidden, collapsed: e.collapsed, visible: e.isVisible } : null);
+    const parents = [];
+    let x = l.parent;
+    for (let i = 0; x && i < 5; i++) { parents.push(etat(x)); x = x.parent; }
+    console.log('[LPC][AdminProfil] état de #dropdownStatut :', JSON.stringify({ liste: etat(l), titre: etat(optionnel(IDS_STATUT.titre)), options: (l.options || []).length, parents }));
+  } catch (e) { console.warn('[LPC][AdminProfil] diagnostic de la liste KO :', e && e.message); }
 }
 async function ouvrirJumelage() {
   hideErr();

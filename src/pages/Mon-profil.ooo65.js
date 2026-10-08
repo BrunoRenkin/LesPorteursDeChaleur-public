@@ -45,10 +45,10 @@ const EL_OPT = {
 // Bouton vers /mon-organisme (06/10) : affiché seulement si « Proposer un lieu » est coché ; absent de F1 et de /adminprofil (leur code le replie)
 const BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];
 // Box des jumelages (#boxResidents et son contenu) : réservée à /adminprofil, replie ici (elle fait partie de la section globale)
-const BOX_ADMIN = ['#boxResidents', '#BoxResidents'];
+const BOX_ADMIN = ['#boxResidents', '#BoxResidents', '#AdminboxResidents'];   // + ID « Admin » au cas où la pile de la section globale a été renommée (08/10)
 // 08/10 : la box est AFFICHÉE ici pour un porteur qui a des jumelages (titre + liste) ; ses boutons restent réservés à /adminprofil
-const IDS_TITRE_JUM = ['#titreJumelages', '#TitreJumelages'];
-const IDS_TEXTE_JUM = ['#textjumelage', '#textJumelage', '#textJumelages'];
+const IDS_TITRE_JUM = ['#titreJumelages', '#TitreJumelages', '#AdmintitreJumelages'];
+const IDS_TEXTE_JUM = ['#textjumelage', '#textJumelage', '#textJumelages', '#Admintextjumelage'];
 const IDS_BOUTONS_ADMIN = ['#buttonJumelages', '#BtnJumelage', '#buttonSendToPorteur'];
 const PAGE_ORGANISME = '/mon-organisme';
 const CAPACITE_LIEU = 'proposer un lieu';
@@ -94,7 +94,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-d (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-e (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -259,6 +259,9 @@ function afficherJumelages() {
   const liste = j.liste || [];
   const box = premier(BOX_ADMIN);
   const porteur = ((d.profil || {}).statuts || []).some((s) => normTxt(s) === 'porteur');
+  console.log('[LPC][Profil] jumelages : statut Porteur =', porteur, '| jumelés reçus :', liste.length, '| box :', box ? box.id : 'introuvable',
+    '| titre :', (premier(IDS_TITRE_JUM) || {}).id || 'introuvable', '| texte :', (premier(IDS_TEXTE_JUM) || {}).id || 'introuvable',
+    '| jumelages dans la réponse :', d.jumelages === undefined ? 'absents (backend ancien ?)' : 'présents');
   if (!porteur || !liste.length) { cacher(box); return; }
   montrer(box);
   const titre = premier(IDS_TITRE_JUM);
