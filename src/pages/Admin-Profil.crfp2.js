@@ -75,7 +75,7 @@ const IDS_TABLE_JUMELAGES = ['#tableJumelage'];
 const IDS_TITRE_JUMELAGES = ['#AdmintitreJumelages'];   // les ID sont sensibles à la casse
 const IDS_TEXTE_JUMELAGES = ['#AdmintexteJumelages'];   // abandonné : replié
 const COLONNES_JUMELAGES = [
-  { dataPath: 'num', label: 'N°', type: 'string' },
+  { dataPath: 'num', label: '', type: 'string' },
   { dataPath: 'nom', label: 'Nom', type: 'string' },
   { dataPath: 'etablissement', label: 'Établissement', type: 'string' },
   { dataPath: 'interets', label: "Centres d'intérêt", type: 'string' }
@@ -125,7 +125,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-j', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-k', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -554,7 +554,15 @@ function remplirTableau(liste) {
   try {
     try {
       const actuelles = Array.isArray(tab.columns) ? tab.columns : [];
-      tab.columns = COLONNES_JUMELAGES.map((c, i) => Object.assign({}, actuelles[i] || {}, c));   // largeurs de l'éditeur conservées
+      const cols = COLONNES_JUMELAGES.map((c, i) => Object.assign({}, actuelles[i] || {}, c));   // largeurs de l'éditeur conservées au départ
+      // 08/10 (Bruno) : 1re colonne (numéro, sans titre) inchangée ; les AUTRES colonnes ont la même largeur (même total que dans l'éditeur)
+      const lg = (c) => Number(c && c.width);
+      if (cols.length > 1 && cols.every((c) => lg(c) > 0)) {
+        const total = cols.reduce((n, c) => n + lg(c), 0);
+        const egale = Math.round(((total - lg(cols[0])) / (cols.length - 1)) * 100) / 100;
+        cols.forEach((c, i) => { if (i > 0) c.width = egale; });
+      } else console.log('[LPC] largeurs de #tableJumelage non lisibles (champ width) : ' + JSON.stringify(actuelles.map((c) => c && c.width)));
+      tab.columns = cols;
     } catch (e) {
       let dp = '?'; try { dp = (tab.columns || []).map((c) => c.dataPath).join(', '); } catch (x) { /* ignoré */ }
       console.warn('[LPC][AdminProfil] colonnes de #tableJumelage non posées (' + (e && e.message) + ') ; dataPath de l\'éditeur : ' + dp);
