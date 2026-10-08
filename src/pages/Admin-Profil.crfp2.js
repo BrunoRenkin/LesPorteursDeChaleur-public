@@ -63,10 +63,14 @@ const IDS_ERREUR = ['#errorText'];
 const EL_ORG = { pile: '#pileOrganisme', lien: '#lienOrganisme' };
 const PAGE_ORGANISME = '/adminorganisme';
 const PAGE_RESIDENTS = '/adminjumelages';
-const IDS_BTN_JUMELAGE = ['#buttonJumelages', '#BtnJumelage'];   // les deux ouvrent /adminjumelages sur ce porteur ; ceux qui existent sont câblés
-const IDS_BOX_RESIDENTS = ['#boxResidents', '#BoxResidents'];
-const IDS_TITRE_JUMELAGES = ['#titreJumelages', '#TitreJumelages'];
-const IDS_TEXTE_JUMELAGES = ['#textjumelage', '#textJumelage', '#textJumelages'];
+// 08/10 : la pile des jumelages de /adminprofil a ses PROPRES ID (préfixe « Admin », éléments de la page) ; ceux de la section globale
+// (#boxResidents…, partagés avec /mon-profil) restent en dernier repli et la box globale est repliée ici.
+const IDS_BTN_JUMELAGE = ['#AdminbuttonJumelages', '#AdminBtnJumelage', '#buttonJumelages', '#BtnJumelage'];   // ouvrent /adminjumelages sur ce porteur ; ceux qui existent sont câblés
+const IDS_BOX_RESIDENTS = ['#AdminboxResidents', '#boxResidents', '#BoxResidents'];
+const IDS_BOX_RESIDENTS_GLOBALE = ['#boxResidents', '#BoxResidents'];
+const IDS_TITRE_JUMELAGES = ['#AdmintitreJumelages', '#titreJumelages', '#TitreJumelages'];
+const IDS_TEXTE_JUMELAGES = ['#Admintextjumelage', '#textjumelage', '#textJumelage', '#textJumelages'];
+const STATUTS_PAR_DEFAUT = ['Porteur', 'Accueillant', 'Partenaire'];   // repli si le serveur n'envoie pas `statutOptions` (backend ancien) ; le serveur valide
 const IDS_BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];   // réservé à /mon-profil : replié ici
 const IDS_BTN_EMAIL = ['#buttonSendToPorteur'];   // masqué par défaut ; affiché quand le porteur a tous ses jumelages
 const GMAIL_COMPTE = 'lesporteursdechaleur@gmail.com';   // ⚠️ compte Gmail d'envoi à CONFIRMER par Bruno (vide = compte Google par défaut du navigateur)
@@ -111,7 +115,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-a', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-b', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -122,6 +126,7 @@ $w.onReady(async () => {
     cacher(champNbResidents()); cacher(premier(TITRE_NB)); cacher(premier(AIDE_NB));
     IDS_SANS_OBJET.forEach((id) => cacher(optionnel(id)));
     IDS_BTN_JUMELAGE.forEach((id) => cacher(optionnel(id)));   // réaffichés par boutonJumelage() si le porteur écrit des cartes
+    IDS_BOX_RESIDENTS_GLOBALE.forEach((id) => cacher(optionnel(id)));   // box de la section globale : remplacée ici par #AdminboxResidents
     cacher(premier(IDS_BOX_RESIDENTS));   // réaffichée par boutonJumelage() pour un porteur
     cacher(premier(IDS_BTN_ORGANISATION));
     cacher(premier(IDS_BTN_EMAIL));      // réaffiché par boutonEmail() si le quota du porteur est rempli
@@ -529,8 +534,12 @@ function afficherJumelages() {
 // envoyé à l'enregistrement. Le serveur ne l'accepte que si le membre n'a toujours aucun statut.
 function statutADefinir() {
   const p = d.profil || {};
-  const options = d.statutOptions || [];
-  if ((p.statuts || []).length || !options.length) return;
+  const sansStatut = !(p.statuts || []).length;
+  console.log('[LPC][AdminProfil] statut : membre ' + (sansStatut ? 'SANS statut' : 'avec statut (' + (p.statuts || []).join(', ') + ')'),
+    '| options reçues :', Array.isArray(d.statutOptions) ? d.statutOptions.length : 'aucune (backend ancien ?)', '| liste présente :', Boolean(optionnel(IDS_STATUT.liste)));
+  if (!sansStatut) return;
+  let options = d.statutOptions || [];
+  if (!options.length) { options = STATUTS_PAR_DEFAUT; console.warn('[LPC][AdminProfil] statutOptions absentes : liste par défaut (le backend admin.web.js en ligne est peut-être ancien)'); }
   const l = optionnel(IDS_STATUT.liste);
   if (!l) { console.warn('[LPC][AdminProfil] ' + IDS_STATUT.liste + ' introuvable : membre sans statut, impossible de le définir'); return; }
   l.options = options.map((v) => ({ label: v, value: v }));
