@@ -1,6 +1,7 @@
 // Code de PAGE « Adminprofil » (/adminprofil) : un administrateur modifie la fiche d'un MEMBRE.
 // Mode « admin » du formulaire générique : la page contient la SECTION GLOBALE de F1 (mêmes ID).
-// version du code : 2026-10-07-b   (07/10 b : mode création : interface préparée avant l'appel serveur, e-mail rendu saisissable en premier)
+// version du code : 2026-10-08-j   (08/10 j : box des jumelages = pile de la PAGE #AdminboxResidents > #AdmintitreJumelages + tableau #tableJumelage ; titre = lien vers /adminjumelages ; plus de bouton dans la box)
+//   (anciennement 2026-10-07-b   (07/10 b : mode création : interface préparée avant l'appel serveur, e-mail rendu saisissable en premier)
 //   (07/10 : MODE CRÉATION /adminprofil?mode=creation : l'admin crée un membre (compte Wix sans mot de passe + fiche Membres) ; e-mail saisissable,
 //    liste #dropdownStatut (Porteur / Accueillant / Partenaire, hors section globale), capacités selon le statut, #checkbox2 = consentement RGPD
 //    recueilli hors site, À COCHER par l'admin ; pas de photo à la création)
@@ -63,17 +64,22 @@ const IDS_ERREUR = ['#errorText'];
 const EL_ORG = { pile: '#pileOrganisme', lien: '#lienOrganisme' };
 const PAGE_ORGANISME = '/adminorganisme';
 const PAGE_RESIDENTS = '/adminjumelages';
-// 08/10 : la pile des jumelages de /adminprofil a ses PROPRES ID (préfixe « Admin », éléments de la page) ; ceux de la section globale
-// (#boxResidents…, partagés avec /mon-profil) restent en dernier repli et la box globale est repliée ici.
-// 08/10 (soir) : décision de Bruno : UNE SEULE box des jumelages, celle de la SECTION GLOBALE (#boxResidents…), partagée avec /mon-profil ; la pile
-// « Admin… » (#AdminboxResidents) est abandonnée et repliée ici par sécurité. Dans l'éditeur, #boxResidents et #dropdownStatut sont masqués au
-// chargement et leur conteneur (box185) est visible : le code les affiche selon le cas.
-const IDS_BTN_JUMELAGE = ['#buttonJumelages', '#BtnJumelage'];   // les deux ouvrent /adminjumelages sur ce porteur ; ceux qui existent sont câblés
-const IDS_BOX_RESIDENTS = ['#boxResidents', '#BoxResidents'];
-const IDS_PILE_ABANDONNEE = ['#AdminboxResidents'];
-const IDS_REPEATER_JUMELAGES = ['#repeaterJumelages', '#repeaterjumelages'];
-const IDS_TITRE_JUMELAGES = ['#titreJumelages', '#TitreJumelages'];
-const IDS_TEXTE_JUMELAGES = ['#textjumelage', '#textJumelage', '#textJumelages'];   // les ID sont sensibles à la casse
+// 08/10 (nuit) : décision de Bruno : une section globale se gère depuis la page où elle se trouve et ses éléments se retrouvent sur
+// /mon-profil. La box des jumelages de /adminprofil est donc la pile de la PAGE : #AdminboxResidents > #AdmintitreJumelages (titre, qui
+// ouvre /adminjumelages) + tableau #tableJumelage (colonnes : n°, nom, établissement, centres d'intérêt). #AdmintexteJumelages est abandonné.
+// Les éléments de la section globale (#boxResidents…) sont repliés ici par sécurité. #BtnJumelage reste le bouton de la page.
+const IDS_BTN_JUMELAGE = ['#BtnJumelage'];   // ouvre /adminjumelages sur ce porteur
+const IDS_BOX_RESIDENTS = ['#AdminboxResidents'];
+const IDS_GLOBAL_A_REPLIER = ['#boxResidents', '#buttonJumelages', '#titreJumelages', '#textjumelage'];   // éléments de la section globale, partagés avec /mon-profil
+const IDS_TABLE_JUMELAGES = ['#tableJumelage'];
+const IDS_TITRE_JUMELAGES = ['#AdmintitreJumelages'];   // les ID sont sensibles à la casse
+const IDS_TEXTE_JUMELAGES = ['#AdmintexteJumelages'];   // abandonné : replié
+const COLONNES_JUMELAGES = [
+  { dataPath: 'num', label: 'N°', type: 'string' },
+  { dataPath: 'nom', label: 'Nom', type: 'string' },
+  { dataPath: 'etablissement', label: 'Établissement', type: 'string' },
+  { dataPath: 'interets', label: "Centres d'intérêt", type: 'string' }
+];
 const STATUTS_PAR_DEFAUT = ['Porteur', 'Accueillant', 'Partenaire'];   // repli si le serveur n'envoie pas `statutOptions` (backend ancien) ; le serveur valide
 const IDS_BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];   // réservé à /mon-profil : replié ici
 const IDS_BTN_EMAIL = ['#buttonSendToPorteur'];   // masqué par défaut ; affiché quand le porteur a tous ses jumelages
@@ -119,7 +125,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-i', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-j', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -130,7 +136,8 @@ $w.onReady(async () => {
     cacher(champNbResidents()); cacher(premier(TITRE_NB)); cacher(premier(AIDE_NB));
     IDS_SANS_OBJET.forEach((id) => cacher(optionnel(id)));
     IDS_BTN_JUMELAGE.forEach((id) => cacher(optionnel(id)));   // réaffichés par boutonJumelage() si le porteur écrit des cartes
-    IDS_PILE_ABANDONNEE.forEach((id) => cacher(optionnel(id)));   // ancienne pile « Admin… » : abandonnée (à supprimer dans l'éditeur)
+    IDS_GLOBAL_A_REPLIER.forEach((id) => cacher(optionnel(id)));   // éléments de la section globale : jamais utilisés ici
+    cacher(premier(IDS_TABLE_JUMELAGES)); cacher(premier(IDS_TEXTE_JUMELAGES));   // réaffichés par afficherJumelages()
     cacher(premier(IDS_BOX_RESIDENTS));   // réaffichée par boutonJumelage() pour un porteur
     cacher(premier(IDS_BTN_ORGANISATION));
     cacher(premier(IDS_BTN_EMAIL));      // réaffiché par boutonEmail() si le quota du porteur est rempli
@@ -498,11 +505,12 @@ function lienOrganisme() {
 }
 // ─── bouton « Jumelage » ─────────────────────────────────────────────────
 // Visible seulement si le porteur ÉCRIT DES CARTES (capacités enregistrées) et a un nombre de cartes ; le serveur recontrôle.
+let lienJumelage = false;   // le titre des jumelages ouvre /adminjumelages seulement si le porteur peut jumeler
 function boutonJumelage() {
   const boutons = IDS_BTN_JUMELAGE.map((id) => optionnel(id)).filter(Boolean);
   const box = premier(IDS_BOX_RESIDENTS);
-  if (!boutons.length) console.warn('[LPC][AdminProfil] #buttonJumelages / #BtnJumelage introuvables');
-  if (!box) console.warn('[LPC][AdminProfil] #boxResidents introuvable');
+  if (!boutons.length) console.warn('[LPC][AdminProfil] #BtnJumelage introuvable');
+  if (!box) console.warn('[LPC][AdminProfil] #AdminboxResidents introuvable');
   const p = d.profil || {};
   // Box visible pour un PORTEUR : « Écrire des cartes » enregistré ET nombre de cartes indiqué (peut jumeler : boutons affichés, le serveur
   // recontrôle), ou statut Porteur avec au moins un jumelage (08/10 : liste seule). Un accueillant n'a pas de jumelages ici : ses
@@ -510,6 +518,7 @@ function boutonJumelage() {
   const peutJumeler = ecritDesCartes(p.capacites) && nombreDe(p.nbResidentsMax);
   const statutPorteur = (p.statuts || []).some((s) => String(s).toLowerCase() === 'porteur');
   const aDesJumelages = statutPorteur && ((d.jumelages || {}).liste || []).length > 0;
+  lienJumelage = Boolean(peutJumeler);
   console.log('[LPC][AdminProfil] jumelages : statut Porteur =', statutPorteur, '| peut jumeler (écrit des cartes + nombre) =', Boolean(peutJumeler),
     '| jumelés reçus :', ((d.jumelages || {}).liste || []).length, '| box :', box ? box.id : 'introuvable',
     '| titre :', (premier(IDS_TITRE_JUMELAGES) || {}).id || 'introuvable', '| texte :', (premier(IDS_TEXTE_JUMELAGES) || {}).id || 'introuvable',
@@ -517,9 +526,7 @@ function boutonJumelage() {
   if (!peutJumeler && !aDesJumelages) { boutons.forEach(cacher); cacher(box); return; }
   montrer(box); montrerParents(box);
   try { let x = box.parent; const ch = []; for (let i = 0; x && i < 5; i++) { ch.push(x.id + ':' + (x.hidden ? 'H' : '') + (x.collapsed ? 'C' : '')); x = x.parent; } console.log('[LPC][AdminProfil] box des jumelages : hidden =', box.hidden, '| collapsed =', box.collapsed, '| visible =', box.isVisible, '| parents :', ch.join(' > ')); } catch (e) { /* ignoré */ }
-  inventaireJumelages();
-  // Un seul bouton de jumelage : le premier trouvé (#buttonJumelages, dans la box) ; l'ancien #BtnJumelage (autre conteneur, box158) reste replié
-  boutons.forEach((b, i) => { if (peutJumeler && i === 0) { montrer(b); montrerParents(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
+  boutons.forEach((b) => { if (peutJumeler) { montrer(b); montrerParents(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
   afficherJumelages();
 }
 /** Diagnostic (08/10) : état à l'exécution de tous les éléments dont l'ID évoque les jumelages ou les résidents (id, masqué, replié, visible, parent). */
@@ -540,23 +547,20 @@ function inventaireJumelages() {
     console.log('[LPC][Inventaire] jumelages / résidents :', sortie.join(' | ') || 'aucun élément');
   } catch (e) { console.warn('[LPC][Inventaire] KO :', e && e.message); }
 }
-let tableauCable = false;
-/** Tableau des jumelés = répéteur #repeaterJumelages (cellules de ligne : #jumNum, #jumResident, #jumOrganisme, #jumInterets). Renvoie false s'il est absent. */
+/** Tableau des jumelés = tableau Wix #tableJumelage (colonnes posées par le code : num, nom, etablissement, interets). Renvoie false s'il est absent. */
 function remplirTableau(liste) {
-  const rep = premier(IDS_REPEATER_JUMELAGES);
-  if (!rep) return false;
+  const tab = premier(IDS_TABLE_JUMELAGES);
+  if (!tab) return false;
   try {
-    cacher(premier(IDS_TEXTE_JUMELAGES));   // le tableau remplace la liste en texte
-    if (!tableauCable && typeof rep.onItemReady === 'function') {
-      tableauCable = true;
-      rep.onItemReady(($item, item) => {
-        [['#jumNum', 'num'], ['#jumResident', 'resident'], ['#jumOrganisme', 'organisme'], ['#jumInterets', 'interets']].forEach(([id, cle]) => {
-          try { const el = $item(id); if (el && 'text' in el) el.text = String(item[cle] || ''); } catch (e) { /* cellule absente : ignorée */ }
-        });
-      });
+    try {
+      const actuelles = Array.isArray(tab.columns) ? tab.columns : [];
+      tab.columns = COLONNES_JUMELAGES.map((c, i) => Object.assign({}, actuelles[i] || {}, c));   // largeurs de l'éditeur conservées
+    } catch (e) {
+      let dp = '?'; try { dp = (tab.columns || []).map((c) => c.dataPath).join(', '); } catch (x) { /* ignoré */ }
+      console.warn('[LPC][AdminProfil] colonnes de #tableJumelage non posées (' + (e && e.message) + ') ; dataPath de l\'éditeur : ' + dp);
     }
-    rep.data = liste.map((x, i) => ({ _id: 'j' + (i + 1), num: String(i + 1), resident: x.nom || '', organisme: x.organisme || '', interets: x.interets || '' }));
-    montrer(rep); montrerParents(rep);
+    tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), num: String(i + 1), nom: x.nom || '', etablissement: x.organisme || '', interets: x.interets || '' }));
+    montrer(tab); montrerParents(tab);
     return true;
   } catch (e) { console.error('[LPC] tableau des jumelages KO :', e); return false; }
 }
@@ -564,27 +568,25 @@ function remplirTableau(liste) {
 function titreJumelages(n, max) {
   return (n > 1 ? 'Jumelages' : 'Jumelage') + ' : ' + n + (Number(max) > 0 ? '/' + Number(max) : '');
 }
-/** #titreJumelages = « Jumelages : X/Y » (X jumelages en cours, Y cartes à écrire) ; tableau = répéteur #repeaterJumelages, à défaut #textjumelage
- *  (liste numérotée, ou « Pas de jumelage en cours »). Prénom + initiale, organisme, centres d'intérêt : aucune donnée de santé ni chambre. */
+/** #AdmintitreJumelages = « Jumelages : X/Y » (X jumelages en cours, Y cartes à écrire), cliquable (→ /adminjumelages) si le porteur peut jumeler ;
+ *  tableau #tableJumelage (une ligne par résident, replié s'il n'y en a pas). Prénom + initiale, établissement, centres d'intérêt : aucune donnée de santé ni chambre. */
 function afficherJumelages() {
   const j = d.jumelages || { encours: 0, max: 0, liste: [] };
   const liste = j.liste || [];
+  cacher(premier(IDS_TEXTE_JUMELAGES));
   const titre = premier(IDS_TITRE_JUMELAGES);
-  if (titre) { try { titre.text = titreJumelages(Number(j.encours) || 0, j.max); montrer(titre); } catch (e) { console.error('[LPC][AdminProfil] titre des jumelages KO :', e); } }
-  else console.warn('[LPC][AdminProfil] #titreJumelages introuvable');
+  if (titre) {
+    try {
+      titre.text = liste.length || Number(j.max) > 0 ? titreJumelages(Number(j.encours) || 0, j.max) : 'Pas de jumelage en cours';
+      montrer(titre);
+      if (lienJumelage && !titreCable && typeof titre.onClick === 'function') { titreCable = true; titre.onClick(ouvrirJumelage); }
+    } catch (e) { console.error('[LPC][AdminProfil] titre des jumelages KO :', e); }
+  } else console.warn('[LPC][AdminProfil] #AdmintitreJumelages introuvable');
   if (liste.length && remplirTableau(liste)) return;
-  cacher(premier(IDS_REPEATER_JUMELAGES));
-  const texte = premier(IDS_TEXTE_JUMELAGES);
-  if (!texte) { console.warn('[LPC][AdminProfil] #textjumelage introuvable'); return; }
-  const lignes = liste.map((x, i) => (i + 1) + '. ' + [x.nom, x.organisme, x.interets].filter(Boolean).join(', '));
-  try {
-    if (texte.html !== undefined) texte.html = lignes.length
-      ? lignes.map((l) => '<p class="font_8" style="margin:0;">' + escapeHtml(l) + '</p>').join('')
-      : '<p class="font_8" style="margin:0;">Pas de jumelage en cours</p>';
-    else texte.text = lignes.length ? lignes.join(String.fromCharCode(10)) : 'Pas de jumelage en cours';
-    montrer(texte);
-  } catch (e) { console.error('[LPC][AdminProfil] liste des jumelages KO :', e); }
+  cacher(premier(IDS_TABLE_JUMELAGES));
+  if (liste.length) console.warn('[LPC][AdminProfil] #tableJumelage introuvable : jumelages non affichés');
 }
+let titreCable = false;
 // ─── statut d'un membre qui n'en a pas (08/10) ───────────────────────────
 // #dropdownStatut (élément de la PAGE, replié par défaut) apparaît seulement pour un membre SANS statut : l'admin le définit, il est
 // envoyé à l'enregistrement. Le serveur ne l'accepte que si le membre n'a toujours aucun statut.
