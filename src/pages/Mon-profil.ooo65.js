@@ -94,7 +94,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-e (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-08-f (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -263,7 +263,8 @@ function afficherJumelages() {
     '| titre :', (premier(IDS_TITRE_JUM) || {}).id || 'introuvable', '| texte :', (premier(IDS_TEXTE_JUM) || {}).id || 'introuvable',
     '| jumelages dans la réponse :', d.jumelages === undefined ? 'absents (backend ancien ?)' : 'présents');
   if (!porteur || !liste.length) { cacher(box); return; }
-  montrer(box);
+  montrer(box); montrerParents(box);
+  try { let x = box.parent; const ch = []; for (let i = 0; x && i < 5; i++) { ch.push(x.id + ':' + (x.hidden ? 'H' : '') + (x.collapsed ? 'C' : '')); x = x.parent; } console.log('[LPC][Profil] box des jumelages : hidden =', box.hidden, '| collapsed =', box.collapsed, '| parents :', ch.join(' > ')); } catch (e) { /* ignoré */ }
   const titre = premier(IDS_TITRE_JUM);
   if (titre) { try { titre.text = 'Jumelage(s) : ' + liste.length; montrer(titre); } catch (e) { console.error('[LPC][Profil] titre des jumelages KO :', e); } }
   else console.warn('[LPC][Profil] #titreJumelages introuvable');
@@ -535,6 +536,19 @@ function optionnel(id) {
 function premier(ids) {
   for (const id of ids) { const e = optionnel(id); if (e) return e; }
   return null;
+}
+/** Réaffiche les conteneurs MASQUÉS ou REPLIÉS au-dessus d'un élément (jusqu'à la section) : montrer l'élément seul ne suffit pas quand son parent
+ *  est masqué dans l'éditeur (constaté le 08/10 : #dropdownStatut dans une boîte `hidden`, donc invisible alors que le code l'« affichait »). */
+function montrerParents(el) {
+  try {
+    let x = el && el.parent;
+    for (let i = 0; x && i < 6; i++) {
+      const id = String(x.id || '');
+      if (/^(section|page|masterpage)/i.test(id)) break;
+      if (x.hidden === true || x.collapsed === true) { console.log('[LPC] conteneur réaffiché :', id); montrer(x); }
+      x = x.parent;
+    }
+  } catch (e) { /* ignoré */ }
 }
 function montrer(el) {
   if (!el) return;

@@ -69,7 +69,7 @@ const IDS_BTN_JUMELAGE = ['#AdminbuttonJumelages', '#AdminBtnJumelage', '#button
 const IDS_BOX_RESIDENTS = ['#AdminboxResidents', '#boxResidents', '#BoxResidents'];
 const IDS_BOX_RESIDENTS_GLOBALE = ['#boxResidents', '#BoxResidents'];
 const IDS_TITRE_JUMELAGES = ['#AdmintitreJumelages', '#titreJumelages', '#TitreJumelages'];
-const IDS_TEXTE_JUMELAGES = ['#Admintextjumelage', '#textjumelage', '#textJumelage', '#textJumelages'];
+const IDS_TEXTE_JUMELAGES = ['#Admintextjumelage', '#AdmintextJumelage', '#AdmintextJumelages', '#textjumelage', '#textJumelage', '#textJumelages'];   // les ID sont sensibles à la casse
 const STATUTS_PAR_DEFAUT = ['Porteur', 'Accueillant', 'Partenaire'];   // repli si le serveur n'envoie pas `statutOptions` (backend ancien) ; le serveur valide
 const IDS_BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];   // réservé à /mon-profil : replié ici
 const IDS_BTN_EMAIL = ['#buttonSendToPorteur'];   // masqué par défaut ; affiché quand le porteur a tous ses jumelages
@@ -115,7 +115,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-c', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-d', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -511,7 +511,7 @@ function boutonJumelage() {
     '| titre :', (premier(IDS_TITRE_JUMELAGES) || {}).id || 'introuvable', '| texte :', (premier(IDS_TEXTE_JUMELAGES) || {}).id || 'introuvable',
     '| boutons :', boutons.map((b) => b.id).join(', ') || 'aucun');
   if (!peutJumeler && !aDesJumelages) { boutons.forEach(cacher); cacher(box); return; }
-  montrer(box);
+  montrer(box); montrerParents(box);
   boutons.forEach((b) => { if (peutJumeler) { montrer(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
   afficherJumelages();
 }
@@ -548,7 +548,7 @@ function statutADefinir() {
   if (!l) { console.warn('[LPC][AdminProfil] ' + IDS_STATUT.liste + ' introuvable : membre sans statut, impossible de le définir'); return; }
   l.options = options.map((v) => ({ label: v, value: v }));
   l.value = '';
-  montrer(l); montrer(optionnel(IDS_STATUT.titre));
+  montrer(l); montrerParents(l); montrer(optionnel(IDS_STATUT.titre));
   statutPropose = true;
   console.log('[LPC][AdminProfil] membre sans statut : liste des statuts affichée');
   // Diagnostic : « affichée » côté code ne garantit pas qu'elle soit visible (parent replié ou masqué dans l'éditeur ?)
@@ -907,6 +907,19 @@ function optionnel(id) {
 function premier(ids) {
   for (const id of ids) { const e = optionnel(id); if (e) return e; }
   return null;
+}
+/** Réaffiche les conteneurs MASQUÉS ou REPLIÉS au-dessus d'un élément (jusqu'à la section) : montrer l'élément seul ne suffit pas quand son parent
+ *  est masqué dans l'éditeur (constaté le 08/10 : #dropdownStatut dans une boîte `hidden`, donc invisible alors que le code l'« affichait »). */
+function montrerParents(el) {
+  try {
+    let x = el && el.parent;
+    for (let i = 0; x && i < 6; i++) {
+      const id = String(x.id || '');
+      if (/^(section|page|masterpage)/i.test(id)) break;
+      if (x.hidden === true || x.collapsed === true) { console.log('[LPC] conteneur réaffiché :', id); montrer(x); }
+      x = x.parent;
+    }
+  } catch (e) { /* ignoré */ }
 }
 function montrer(el) {
   if (!el) return;
