@@ -42,3 +42,18 @@
 .lpc-bouton-contour, .lpc-bouton-contour * { color: #C61010 !important; }
 .lpc-bouton-contour:hover { background-color: #C61010 !important; }
 .lpc-bouton-contour:hover, .lpc-bouton-contour:hover * { color: #FFFFFF !important; }
+
+/* Champ e-mail SAISISSABLE (09/10/2026) : posée par le code sur le champ de la section globale uniquement en mode création d'un membre par l'admin
+   (page-adminprofil.js), où il n'est plus grisé. Annule l'apparence « désactivée » de l'éditeur (texte et libellé gris). */
+.lpc-saisie input,
+.lpc-saisie .wixui-text-input__input {
+  color: #000000 !important;
+  -webkit-text-fill-color: #000000 !important;
+  background-color: #FFFFFF !important;
+  cursor: text !important;
+  opacity: 1 !important;
+}
+.lpc-saisie label,
+.lpc-saisie .wixui-text-input__label {
+  color: #000000 !important;
+}

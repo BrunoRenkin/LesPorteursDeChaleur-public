@@ -125,7 +125,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-09-b', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-09-c', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -211,6 +211,7 @@ async function initCreation() {
     try { el.value = ''; } catch (e) { /* ignoré */ }
     try { if (typeof el.enable === 'function') el.enable(); } catch (e) { /* ignoré */ }
     try { if (el.customClassList) el.customClassList.remove('lpc-desactive'); } catch (e) { /* ignoré */ }
+    try { if (el.customClassList) el.customClassList.add('lpc-saisie'); } catch (e) { /* ignoré */ }   // 09/10 : apparence « saisissable » (global.css) : le champ n'est plus grisé en création
     try { if (typeof el.resetValidityIndication === 'function') el.resetValidityIndication(); } catch (e) { /* ignoré */ }
     console.log('[LPC][AdminProfil] création : e-mail #' + el.id + ' | enabled = ' + el.enabled + ' | readOnly = ' + el.readOnly);
     try { if (el.readOnly === true) el.readOnly = false; } catch (e) { /* ignoré */ }
