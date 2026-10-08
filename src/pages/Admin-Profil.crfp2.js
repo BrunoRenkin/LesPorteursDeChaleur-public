@@ -71,6 +71,7 @@ const PAGE_RESIDENTS = '/adminjumelages';
 const IDS_BTN_JUMELAGE = ['#buttonJumelages', '#BtnJumelage'];   // les deux ouvrent /adminjumelages sur ce porteur ; ceux qui existent sont câblés
 const IDS_BOX_RESIDENTS = ['#boxResidents', '#BoxResidents'];
 const IDS_PILE_ABANDONNEE = ['#AdminboxResidents'];
+const IDS_REPEATER_JUMELAGES = ['#repeaterJumelages', '#repeaterjumelages'];
 const IDS_TITRE_JUMELAGES = ['#titreJumelages', '#TitreJumelages'];
 const IDS_TEXTE_JUMELAGES = ['#textjumelage', '#textJumelage', '#textJumelages'];   // les ID sont sensibles à la casse
 const STATUTS_PAR_DEFAUT = ['Porteur', 'Accueillant', 'Partenaire'];   // repli si le serveur n'envoie pas `statutOptions` (backend ancien) ; le serveur valide
@@ -118,7 +119,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-08-f', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-08-g', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -515,19 +516,47 @@ function boutonJumelage() {
     '| boutons :', boutons.map((b) => b.id).join(', ') || 'aucun');
   if (!peutJumeler && !aDesJumelages) { boutons.forEach(cacher); cacher(box); return; }
   montrer(box); montrerParents(box);
+  try { let x = box.parent; const ch = []; for (let i = 0; x && i < 5; i++) { ch.push(x.id + ':' + (x.hidden ? 'H' : '') + (x.collapsed ? 'C' : '')); x = x.parent; } console.log('[LPC][AdminProfil] box des jumelages : hidden =', box.hidden, '| collapsed =', box.collapsed, '| visible =', box.isVisible, '| parents :', ch.join(' > ')); } catch (e) { /* ignoré */ }
   boutons.forEach((b) => { if (peutJumeler) { montrer(b); if (typeof b.onClick === 'function') b.onClick(ouvrirJumelage); } else cacher(b); });
   afficherJumelages();
 }
-/** #titreJumelages = « Jumelage(s) : X/Y » (X jumelages en cours, Y cartes à écrire ; « X » seul si Y inconnu) ; #textjumelage = liste numérotée
- *  « Prénom I., Organisme, centres d'intérêt », ou « Pas de jumelage en cours ». Aucune donnée de santé ni chambre. */
+let tableauCable = false;
+/** Tableau des jumelés = répéteur #repeaterJumelages (cellules de ligne : #jumNum, #jumResident, #jumOrganisme, #jumInterets). Renvoie false s'il est absent. */
+function remplirTableau(liste) {
+  const rep = premier(IDS_REPEATER_JUMELAGES);
+  if (!rep) return false;
+  try {
+    cacher(premier(IDS_TEXTE_JUMELAGES));   // le tableau remplace la liste en texte
+    if (!tableauCable && typeof rep.onItemReady === 'function') {
+      tableauCable = true;
+      rep.onItemReady(($item, item) => {
+        [['#jumNum', 'num'], ['#jumResident', 'resident'], ['#jumOrganisme', 'organisme'], ['#jumInterets', 'interets']].forEach(([id, cle]) => {
+          try { const el = $item(id); if (el && 'text' in el) el.text = String(item[cle] || ''); } catch (e) { /* cellule absente : ignorée */ }
+        });
+      });
+    }
+    rep.data = liste.map((x, i) => ({ _id: 'j' + (i + 1), num: String(i + 1), resident: x.nom || '', organisme: x.organisme || '', interets: x.interets || '' }));
+    montrer(rep); montrerParents(rep);
+    return true;
+  } catch (e) { console.error('[LPC] tableau des jumelages KO :', e); return false; }
+}
+/** « Jumelages : 2/2 » : « Jumelage » au singulier pour 0 ou 1 ; « /Y » (cartes à écrire) seulement si Y est connu. */
+function titreJumelages(n, max) {
+  return (n > 1 ? 'Jumelages' : 'Jumelage') + ' : ' + n + (Number(max) > 0 ? '/' + Number(max) : '');
+}
+/** #titreJumelages = « Jumelages : X/Y » (X jumelages en cours, Y cartes à écrire) ; tableau = répéteur #repeaterJumelages, à défaut #textjumelage
+ *  (liste numérotée, ou « Pas de jumelage en cours »). Prénom + initiale, organisme, centres d'intérêt : aucune donnée de santé ni chambre. */
 function afficherJumelages() {
   const j = d.jumelages || { encours: 0, max: 0, liste: [] };
+  const liste = j.liste || [];
   const titre = premier(IDS_TITRE_JUMELAGES);
-  if (titre) { try { titre.text = 'Jumelage(s) : ' + (Number(j.encours) || 0) + (Number(j.max) > 0 ? '/' + Number(j.max) : ''); montrer(titre); } catch (e) { console.error('[LPC][AdminProfil] titre des jumelages KO :', e); } }
+  if (titre) { try { titre.text = titreJumelages(Number(j.encours) || 0, j.max); montrer(titre); } catch (e) { console.error('[LPC][AdminProfil] titre des jumelages KO :', e); } }
   else console.warn('[LPC][AdminProfil] #titreJumelages introuvable');
+  if (liste.length && remplirTableau(liste)) return;
+  cacher(premier(IDS_REPEATER_JUMELAGES));
   const texte = premier(IDS_TEXTE_JUMELAGES);
   if (!texte) { console.warn('[LPC][AdminProfil] #textjumelage introuvable'); return; }
-  const lignes = (j.liste || []).map((x, i) => (i + 1) + '. ' + [x.nom, x.organisme, x.interets].filter(Boolean).join(', '));
+  const lignes = liste.map((x, i) => (i + 1) + '. ' + [x.nom, x.organisme, x.interets].filter(Boolean).join(', '));
   try {
     if (texte.html !== undefined) texte.html = lignes.length
       ? lignes.map((l) => '<p class="font_8" style="margin:0;">' + escapeHtml(l) + '</p>').join('')
