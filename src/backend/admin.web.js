@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-08-b';
+const VERSION = '2026-10-08-c';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -116,13 +116,28 @@ const texteResidents = (s) => `${s.jumeles} / ${s.total}`;   // « 5 / 5 » = 5 
 // Chaque ligne porte `_id`, les colonnes affichées et `filtres` (valeurs testées par le filtre).
 
 /** Comptes Wix qui n'ont PAS de fiche `Membres` (ex. code d'activation jamais saisi : members-sync n'a jamais tourné). 100 maximum par appel Wix. */
-async function comptesWixSansFiche(membres) {
+const LIB_NON_VERIFIE = 'E-mail non vérifié';
+const LIB_SANS_PROFIL = 'Pas de profil, juste un compte avec son e-mail';
+const FILTRE_SANS_PROFIL = 'Pas de profil';
+
+/** Comptes Wix (100 maximum, champs complets : `loginEmailVerified` en fait partie) ; null si la requête échoue. */
+async function tousMembresWix() {
   try {
-    const ids = new Set(membres.map((m) => m.wixMemberId).filter(Boolean));
-    const emails = new Set(membres.map((m) => String(m.email || '').toLowerCase()).filter(Boolean));
     const res = await queryMembersWix({ fieldsets: ['FULL'] }).limit(100).find();
     const items = res.items || res._items || [];
     if ((res.totalCount || res._totalCount || 0) > items.length) console.warn('[LPC][Admin] comptes Wix : liste tronquée à ' + items.length);
+    return items;
+  } catch (e) {
+    console.warn('[LPC][Admin] comptes Wix : requête KO (queryMembers avec elevate ?) :', e && (e.message || e));
+    return null;
+  }
+}
+
+async function comptesWixSansFiche(membres, items) {
+  if (!items) return [];
+  try {
+    const ids = new Set(membres.map((m) => m.wixMemberId).filter(Boolean));
+    const emails = new Set(membres.map((m) => String(m.email || '').toLowerCase()).filter(Boolean));
     return items
       .filter((m) => m && m._id && m.status !== 'BLOCKED' && !ids.has(m._id) && !emails.has(String(m.loginEmail || '').toLowerCase()))
       .map((m) => {
@@ -134,13 +149,13 @@ async function comptesWixSansFiche(membres) {
           email: m.loginEmail || '',
           telephone: String(tel),
           localite: '',
-          statuts: 'Non validé',
+          statuts: m.loginEmailVerified === false ? LIB_NON_VERIFIE : LIB_SANS_PROFIL,   // 08/10 : intitulés demandés par Bruno
           organisation: '',
           cartes: '',
           ...dates(m),
           _jum: 0,
           nonValide: true,
-          filtres: ['Non validé'],
+          filtres: m.loginEmailVerified === false ? [LIB_NON_VERIFIE, FILTRE_SANS_PROFIL] : [FILTRE_SANS_PROFIL],
         };
       });
   } catch (e) {
@@ -154,8 +169,11 @@ async function lignesMembres() {
     tout('Membres', 'type', 'capacites'), tout('Organisations'), jumelagesEnCours(),
   ]);
   const nomOrg = new Map(orgs.map((o) => [o._id, o.nom || '']));
+  const itemsWix = await tousMembresWix();
+  const nonVerifies = new Set((itemsWix || []).filter((w) => w && w.loginEmailVerified === false).map((w) => w._id));
   const lignes = membres.map((m) => {
     const statuts = asArr(m.type).map((s) => s && s.statut).filter(Boolean);
+    const emailNonVerifie = Boolean(m.wixMemberId) && nonVerifies.has(m.wixMemberId);   // 08/10 : e-mail du compte Wix non vérifié
     const cartes = ecrit(m.capacites);
     const max = Number(m.nbResidentsMax) || 0;
     const encours = j.parPorteur.get(m._id) || 0;
@@ -165,16 +183,16 @@ async function lignesMembres() {
       email: m.email || '',
       telephone: m.telephone || '',
       localite: m.localite || '',
-      statuts: statuts.join(', '),
+      statuts: [...statuts, ...(emailNonVerifie ? [LIB_NON_VERIFIE] : [])].join(', '),
       organisation: nomOrg.get(idsOf(m.organisation_id)[0]) || '',
       cartes: cartes ? `${encours} / ${max || '?'}` : '',
       ...dates(m),
       _jum: encours,
-      filtres: [...statuts, cartes ? 'Écrit des cartes' : '', cartes && encours < max ? 'Non jumelés' : ''].filter(Boolean),
+      filtres: [...statuts, cartes ? 'Écrit des cartes' : '', cartes && encours < max ? 'Non jumelés' : '', emailNonVerifie ? LIB_NON_VERIFIE : ''].filter(Boolean),
     };
   });
-  const nonValides = await comptesWixSansFiche(membres);
-  return { lignes: [...lignes, ...nonValides], options: ['Porteur', 'Accueillant', 'Partenaire', 'Écrit des cartes', 'Non jumelés', 'Non validé'] };
+  const nonValides = await comptesWixSansFiche(membres, itemsWix);
+  return { lignes: [...lignes, ...nonValides], options: ['Porteur', 'Accueillant', 'Partenaire', 'Écrit des cartes', 'Non jumelés', LIB_NON_VERIFIE, FILTRE_SANS_PROFIL] };
 }
 
 async function lignesOrganismes() {
