@@ -1,6 +1,7 @@
 // Code de PAGE « Adminprofil » (/adminprofil) : un administrateur modifie la fiche d'un MEMBRE.
 // Mode « admin » du formulaire générique : la page contient la SECTION GLOBALE de F1 (mêmes ID).
-// version du code : 2026-10-10-b   (10/10 b : le lien vers /adminjumelages n'est plus sur le titre #AdmintitreJumelages mais sur #LienJumelages (visible seulement si le porteur peut jumeler))
+// version du code : 2026-10-10-c   (10/10 c : création : le détail de l'erreur Wix est écrit en console)
+//   (anciennement 2026-10-10-b   (10/10 b : le lien vers /adminjumelages n'est plus sur le titre #AdmintitreJumelages mais sur #LienJumelages (visible seulement si le porteur peut jumeler))
 //   (anciennement 2026-10-10-a   (10/10 a : mode création : photo (ajout, vignette, retrait, consentement image) comme en modification, envoyée à la création ; capacités rouvertes explicitement ; tableau des jumelages : colonnes Nom / Centres d'intérêt / Établissement, police et graisse harmonisées (classe lpc-table-jumelage))
 //   (anciennement 2026-10-08-j   (08/10 j : box des jumelages = pile de la PAGE #AdminboxResidents > #AdmintitreJumelages + tableau #tableJumelage ; titre = lien vers /adminjumelages ; plus de bouton dans la box)
 //   (anciennement 2026-10-07-b   (07/10 b : mode création : interface préparée avant l'appel serveur, e-mail rendu saisissable en premier)
@@ -129,7 +130,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-10-b', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-10-c', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -315,7 +316,7 @@ async function sauverCreation() {
       photoH: photoCreation ? photoCreation.h : undefined,
       consentementPhoto: photoCreation ? Boolean((optionnel(EL.consentementPhoto) || {}).checked) : undefined,
     })) || {};
-    console.log('[LPC][AdminProfil] création', { ok: res.ok, reason: res.reason, role: res.role, version: res.version });
+    console.log('[LPC][AdminProfil] création', { ok: res.ok, reason: res.reason, detail: res.detail, role: res.role, version: res.version });
     if (res.refuse) { wixLocation.to('/'); return; }
     if (res.ok) {
       if (res.role === false) console.warn('[LPC][AdminProfil] membre créé mais rôle « Membre Normal » non attribué (voir Site Monitoring)');

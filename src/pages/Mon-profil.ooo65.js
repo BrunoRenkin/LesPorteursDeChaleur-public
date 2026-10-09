@@ -48,7 +48,7 @@ const BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];
 // 08/10 (nuit) : décision de Bruno : la box des jumelages affichée partout est la pile #AdminboxResidents > #AdmintitreJumelages + tableau #tableJumelage
 // (même code que /adminprofil) ; les éléments « globaux » d'origine (#boxResidents…) sont repliés.
 const BOX_ADMIN = ['#AdminboxResidents'];
-const IDS_GLOBAL_A_REPLIER = ['#boxResidents', '#buttonJumelages', '#titreJumelages', '#textjumelage'];   // anciens éléments de la section globale : abandonnés, repliés ici
+const IDS_GLOBAL_A_REPLIER = ['#boxResidents', '#buttonJumelages', '#titreJumelages', '#textjumelage', '#LienJumelages'];   // anciens éléments de la section globale : abandonnés, repliés ici
 const IDS_TABLE_JUMELAGES = ['#tableJumelage'];
 const COLONNES_JUMELAGES = [
   { dataPath: 'nom', label: 'Nom', type: 'string' },
@@ -104,7 +104,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-10-a (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-10-b (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
