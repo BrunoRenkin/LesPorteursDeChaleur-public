@@ -1,5 +1,6 @@
 // Code de PAGE « Back-office » (/admin) — listes filtrables Membres / Organismes / Résidents + export.
-// version du code : 2026-10-10-a   (10/10 a : onglet Membres : fiche dont l'e-mail Wix n'est pas vérifié = 2e bouton facultatif #btnEnvoyerLien « Envoyer le lien » à côté de « Modifier »)
+// version du code : 2026-10-10-b   (10/10 b : bouton « Créer un membre » visible sur les trois onglets)
+//   (anciennement 2026-10-10-a   (10/10 a : onglet Membres : fiche dont l'e-mail Wix n'est pas vérifié = 2e bouton facultatif #btnEnvoyerLien « Envoyer le lien » à côté de « Modifier »)
 //   (anciennement 2026-10-07-c   (07/10 c : « Non validé » + bouton « Valider » ; 07/10 : troncature à 60 caractères des textes libres ; bouton #btnCreerMembre ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes »)
 //
 // Page « Membres uniquement », hors menu, non indexée. Ce réglage n'est qu'un confort : le contrôle
@@ -26,7 +27,7 @@ import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
 import { adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 
-const VERSION = '2026-10-10-a';   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-10-b';   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -372,7 +373,7 @@ function peindreOnglets() {
   // Bouton « Jumelage » : jamais actif ici (sa page est /adminjumelages), donc toujours au style inactif
   ['#ongletsJumelagesAdmin', '#ongletsJumelages', '#ongletJumelagesAdmin', '#ongletJumelages'].forEach((id) => peindre(el1(id), ONGLET_INACTIF));
   montrer('#btnEmails', onglet === 'membres');
-  montrer('#btnCreerMembre', onglet === 'membres');   // 07/10 : visible sur l'onglet Membres seulement
+  montrer('#btnCreerMembre', true);   // 10/10 : visible sur les trois onglets (ex-07/10 : onglet Membres seulement)
 }
 
 async function changerOnglet(o) {
