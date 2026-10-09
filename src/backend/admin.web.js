@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-10-b';
+const VERSION = '2026-10-10-c';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -685,32 +685,25 @@ async function langueDuContact(contactId) {
 
 /** createMember (wix-members.v2) : la doc montre deux formes d'argument ({ member } ou l'objet seul) ; on essaie la première, puis la seconde. */
 async function creerCompteWix(membre) {
-  // 10/10 : si Wix refuse le compte, nouvel essai SANS téléphone (suspect : un numéro refusé bloquait toute création) ; le numéro est poussé ensuite par updateMember.
-  const variantes = [{ membre, sansTel: false }];
-  if (membre.contact && membre.contact.phones) {
-    const contact = Object.assign({}, membre.contact); delete contact.phones;
-    variantes.push({ membre: Object.assign({}, membre, { contact }), sansTel: true });
-  }
+  // 10/10 : Wix refuse la création quand l'e-mail OU le téléphone correspond déjà à un compte (constaté par Bruno) : pas de nouvel essai sans téléphone, le refus est signalé.
   let derniere = null;
-  for (const v of variantes) {
-    for (const arg of [{ member: v.membre }, v.membre]) {
-      try {
-        const res = await createMemberWix(arg);
-        const m = (res && res.member) || res;
-        if (m && m._id) return { compte: m, sansTel: v.sansTel, erreur: '' };
-      } catch (e) { derniere = e; }
-    }
+  for (const arg of [{ member: membre }, membre]) {
+    try {
+      const res = await createMemberWix(arg);
+      const m = (res && res.member) || res;
+      if (m && m._id) return { compte: m, erreur: '' };
+    } catch (e) { derniere = e; }
   }
   const erreur = String((derniere && (derniere.message || derniere.code || derniere)) || 'inconnue').slice(0, 300);
   console.warn('[LPC][Admin] createMember KO :', erreur);
-  return { compte: null, sansTel: false, erreur };
+  return { compte: null, erreur };
 }
 
 /**
  * payload = { prenom, nom, email, telephone, localite, commentaire, statut, capacites: string[], disponibilites: string[],
  *             nbResidentsMax?, photoUrl?, photoW?, photoH?, consentementPhoto? }   (10/10 : photo facultative, média Wix téléversé par la page)
  * Refus renvoyés en { ok: false, reason } : 'donnees-invalides', 'statut-invalide', 'consentement-requis', 'nb-requis', 'photo-invalide',
- * 'email-existant' (fiche déjà présente), 'wix-refuse' (compte Wix refusé : adresse déjà inscrite ?), 'fiche-ko'.
+ * 'email-existant' (fiche déjà présente), 'wix-refuse' (compte Wix refusé : e-mail ou téléphone déjà utilisé par un compte), 'fiche-ko'.
  */
 export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload = {}) => {
   let admin;
@@ -746,10 +739,6 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
   const creation = await creerCompteWix({ loginEmail: email, privacyStatus: 'PRIVATE', contact });
   const compte = creation.compte;
   if (!compte) return { ok: false, reason: 'wix-refuse', detail: creation.erreur };   // detail : message d'erreur de Wix (affiché en console par la page, aide au diagnostic)
-  if (creation.sansTel && tel164) {
-    try { await updateMember(compte._id, { contactDetails: { phones: [tel164] } }); }
-    catch (e) { console.warn('[LPC][Admin] création : téléphone refusé par Wix, compte créé sans téléphone :', e && (e.message || e)); }
-  }
 
   let rowId = '';
   try {

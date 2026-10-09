@@ -1,5 +1,6 @@
 // Code de PAGE « Back-office » (/admin) — listes filtrables Membres / Organismes / Résidents + export.
-// version du code : 2026-10-07-c   (07/10 c : « Non validé » + bouton « Valider » ; 07/10 : troncature à 60 caractères des textes libres ; bouton #btnCreerMembre ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes »)
+// version du code : 2026-10-10-a   (10/10 a : onglet Membres : fiche dont l'e-mail Wix n'est pas vérifié = 2e bouton facultatif #btnEnvoyerLien « Envoyer le lien » à côté de « Modifier »)
+//   (anciennement 2026-10-07-c   (07/10 c : « Non validé » + bouton « Valider » ; 07/10 : troncature à 60 caractères des textes libres ; bouton #btnCreerMembre ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes »)
 //
 // Page « Membres uniquement », hors menu, non indexée. Ce réglage n'est qu'un confort : le contrôle
 // réel est dans le backend (backend/admin.web.js → backend/lpc-acces.js). Un membre non admin ne
@@ -25,7 +26,7 @@ import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
 import { adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 
-const VERSION = '2026-10-08-b';   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-10-a';   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -203,6 +204,18 @@ function remplirItem($item, d) {
       }
     });
   }
+  safe('bouton Envoyer le lien (fiche à e-mail non vérifié)', () => {
+    // 10/10 : élément FACULTATIF du modèle de ligne ; visible seulement sur une fiche de l'onglet Membres dont l'e-mail Wix n'est pas vérifié
+    const l = $item('#btnEnvoyerLien');
+    if (!l || typeof l.onClick !== 'function') { if (!lienLigneSignale) { lienLigneSignale = true; console.log('[LPC][Admin] #btnEnvoyerLien absent du modèle de ligne (facultatif) : « Envoyer le lien » reste disponible depuis la fiche'); } return; }
+    const oui = onglet === 'membres' && !d.nonValide && d.emailNonVerifie === true;
+    if (!oui) { try { if ('text' in l) l.text = ''; } catch (e) { /* ignoré */ } if (l.hide) l.hide(); return; }
+    const estBouton = 'label' in l;
+    try { if (estBouton) l.label = 'Envoyer le lien'; else l.text = 'Envoyer le lien'; } catch (e) { /* ignoré */ }
+    try { if (!estBouton && l.customClassList) { l.customClassList.add('lpc-bouton'); l.customClassList.add('lpc-bouton-contour'); } } catch (e) { /* ignoré */ }   // un texte n'a ni fond ni bordure dans l'éditeur : classes de global.css
+    l.onClick(() => envoyerLien(d));
+    if (l.show) l.show();
+  });
   safe('bouton Modifier', () => {
     const b = $item('#btnModifier');
     if (b && 'label' in b) b.label = d.nonValide ? (d.emailNonVerifie ? 'Envoyer le lien' : 'Créer le profil') : (LIBELLE_BOUTON[onglet] || 'Modifier');   // compte Wix sans fiche : « Créer le profil » crée la fiche (renommé le 08/10, ex-« Valider »)
@@ -298,6 +311,7 @@ $w.onReady(async () => {
 
 let aideOuverte = false;
 let modifierSignale = false;
+let lienLigneSignale = false;
 /** Aide en fenêtre (lightbox « AideAdmin », voir lightbox-aide-admin.js) ; à défaut, zone #texteAide. */
 async function basculerAide(forcer) {
   if (forcer === false) { aideOuverte = false; montrer('#texteAide', false); return; }

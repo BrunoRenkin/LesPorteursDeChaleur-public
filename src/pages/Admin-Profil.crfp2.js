@@ -1,6 +1,7 @@
 // Code de PAGE « Adminprofil » (/adminprofil) : un administrateur modifie la fiche d'un MEMBRE.
 // Mode « admin » du formulaire générique : la page contient la SECTION GLOBALE de F1 (mêmes ID).
-// version du code : 2026-10-10-c   (10/10 c : création : le détail de l'erreur Wix est écrit en console)
+// version du code : 2026-10-10-d   (10/10 d : message de refus de création : e-mail ou téléphone déjà utilisé)
+//   (anciennement 2026-10-10-c   (10/10 c : création : le détail de l'erreur Wix est écrit en console)
 //   (anciennement 2026-10-10-b   (10/10 b : le lien vers /adminjumelages n'est plus sur le titre #AdmintitreJumelages mais sur #LienJumelages (visible seulement si le porteur peut jumeler))
 //   (anciennement 2026-10-10-a   (10/10 a : mode création : photo (ajout, vignette, retrait, consentement image) comme en modification, envoyée à la création ; capacités rouvertes explicitement ; tableau des jumelages : colonnes Nom / Centres d'intérêt / Établissement, police et graisse harmonisées (classe lpc-table-jumelage))
 //   (anciennement 2026-10-08-j   (08/10 j : box des jumelages = pile de la PAGE #AdminboxResidents > #AdmintitreJumelages + tableau #tableJumelage ; titre = lien vers /adminjumelages ; plus de bouton dans la box)
@@ -130,7 +131,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-10-c', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-10-d', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -279,7 +280,7 @@ const MSG_CREATION = {
   'nb-requis': 'Indiquez un nombre de cartes entre 1 et 99.',
   'photo-invalide': "La photo n'a pas été reconnue : choisissez-en une autre ou retirez-la.",
   'email-existant': 'Un membre avec cette adresse e-mail existe déjà.',
-  'wix-refuse': "Wix a refusé de créer le compte (adresse déjà inscrite sur le site sans fiche ?). Si la personne s'est déjà inscrite, sa fiche se créera à sa connexion.",
+  'wix-refuse': "Wix a refusé de créer le compte : l'e-mail ou le numéro de téléphone correspond à un compte déjà créé. Si la personne s'est déjà inscrite, sa fiche se créera à sa connexion.",
   'fiche-ko': "Le compte Wix a été créé mais la fiche n'a pas pu être enregistrée : elle se créera à la première connexion du membre (sans statut). Prévenez Bruno.",
 };
 async function sauverCreation() {
