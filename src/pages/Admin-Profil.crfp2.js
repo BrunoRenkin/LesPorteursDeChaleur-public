@@ -1,6 +1,7 @@
 // Code de PAGE « Adminprofil » (/adminprofil) : un administrateur modifie la fiche d'un MEMBRE.
 // Mode « admin » du formulaire générique : la page contient la SECTION GLOBALE de F1 (mêmes ID).
-// version du code : 2026-10-10-a   (10/10 a : mode création : photo (ajout, vignette, retrait, consentement image) comme en modification, envoyée à la création ; capacités rouvertes explicitement ; tableau des jumelages : colonnes Nom / Centres d'intérêt / Établissement, police et graisse harmonisées (classe lpc-table-jumelage))
+// version du code : 2026-10-10-b   (10/10 b : le lien vers /adminjumelages n'est plus sur le titre #AdmintitreJumelages mais sur #LienJumelages (visible seulement si le porteur peut jumeler))
+//   (anciennement 2026-10-10-a   (10/10 a : mode création : photo (ajout, vignette, retrait, consentement image) comme en modification, envoyée à la création ; capacités rouvertes explicitement ; tableau des jumelages : colonnes Nom / Centres d'intérêt / Établissement, police et graisse harmonisées (classe lpc-table-jumelage))
 //   (anciennement 2026-10-08-j   (08/10 j : box des jumelages = pile de la PAGE #AdminboxResidents > #AdmintitreJumelages + tableau #tableJumelage ; titre = lien vers /adminjumelages ; plus de bouton dans la box)
 //   (anciennement 2026-10-07-b   (07/10 b : mode création : interface préparée avant l'appel serveur, e-mail rendu saisissable en premier)
 //   (07/10 : MODE CRÉATION /adminprofil?mode=creation : l'admin crée un membre (compte Wix sans mot de passe + fiche Membres) ; e-mail saisissable,
@@ -73,6 +74,7 @@ const IDS_BTN_JUMELAGE = ['#BtnJumelage'];   // ouvre /adminjumelages sur ce por
 const IDS_BOX_RESIDENTS = ['#AdminboxResidents'];
 const IDS_GLOBAL_A_REPLIER = ['#boxResidents', '#buttonJumelages', '#titreJumelages', '#textjumelage'];   // éléments de la section globale, partagés avec /mon-profil
 const IDS_TABLE_JUMELAGES = ['#tableJumelage'];
+const IDS_LIEN_JUMELAGES = ['#LienJumelages'];   // 10/10 : lien vers /adminjumelages (ex-clic sur le titre), affiché seulement si le porteur peut jumeler
 const IDS_TITRE_JUMELAGES = ['#AdmintitreJumelages'];   // les ID sont sensibles à la casse
 const IDS_TEXTE_JUMELAGES = ['#AdmintexteJumelages'];   // abandonné : replié
 const COLONNES_JUMELAGES = [
@@ -127,7 +129,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-10-a', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-10-b', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -141,6 +143,7 @@ $w.onReady(async () => {
     IDS_GLOBAL_A_REPLIER.forEach((id) => cacher(optionnel(id)));   // éléments de la section globale : jamais utilisés ici
     cacher(premier(IDS_TABLE_JUMELAGES)); cacher(premier(IDS_TEXTE_JUMELAGES));   // réaffichés par afficherJumelages()
     cacher(premier(IDS_BOX_RESIDENTS));   // réaffichée par boutonJumelage() pour un porteur
+    cacher(premier(IDS_LIEN_JUMELAGES));   // réaffiché par afficherJumelages() si le porteur peut jumeler
     cacher(premier(IDS_BTN_ORGANISATION));
     IDS_BTN_LIEN_MDP.forEach((id) => cacher(optionnel(id)));   // réaffiché par boutonLienMdp() si l'e-mail n'est pas vérifié
     cacher(premier(IDS_BTN_EMAIL));      // réaffiché par boutonEmail() si le quota du porteur est rempli
@@ -515,7 +518,7 @@ function lienOrganisme() {
 }
 // ─── bouton « Jumelage » ─────────────────────────────────────────────────
 // Visible seulement si le porteur ÉCRIT DES CARTES (capacités enregistrées) et a un nombre de cartes ; le serveur recontrôle.
-let lienJumelage = false;   // le titre des jumelages ouvre /adminjumelages seulement si le porteur peut jumeler
+let lienJumelage = false;   // #LienJumelages ouvre /adminjumelages seulement si le porteur peut jumeler
 function boutonJumelage() {
   const boutons = IDS_BTN_JUMELAGE.map((id) => optionnel(id)).filter(Boolean);
   const box = premier(IDS_BOX_RESIDENTS);
@@ -584,7 +587,7 @@ function remplirTableau(liste) {
 function titreJumelages(n, max) {
   return (n > 1 ? 'Jumelages' : 'Jumelage') + ' : ' + n + (Number(max) > 0 ? '/' + Number(max) : '');
 }
-/** #AdmintitreJumelages = « Jumelages : X/Y » (X jumelages en cours, Y cartes à écrire), cliquable (→ /adminjumelages) si le porteur peut jumeler ;
+/** #AdmintitreJumelages = « Jumelages : X/Y » (X jumelages en cours, Y cartes à écrire), (non cliquable : le lien vers /adminjumelages est #LienJumelages) ;
  *  tableau #tableJumelage (une ligne par résident, replié s'il n'y en a pas). Prénom + initiale, établissement, centres d'intérêt : aucune donnée de santé ni chambre. */
 function afficherJumelages() {
   const j = d.jumelages || { encours: 0, max: 0, liste: [] };
@@ -595,14 +598,20 @@ function afficherJumelages() {
     try {
       titre.text = liste.length || Number(j.max) > 0 ? titreJumelages(Number(j.encours) || 0, j.max) : 'Pas de jumelage en cours';
       montrer(titre);
-      if (lienJumelage && !titreCable && typeof titre.onClick === 'function') { titreCable = true; titre.onClick(ouvrirJumelage); }
     } catch (e) { console.error('[LPC][AdminProfil] titre des jumelages KO :', e); }
   } else console.warn('[LPC][AdminProfil] #AdmintitreJumelages introuvable');
+  const lien = premier(IDS_LIEN_JUMELAGES);
+  if (!lien) console.warn('[LPC][AdminProfil] #LienJumelages introuvable : lien vers /adminjumelages non disponible');
+  else if (!lienJumelage) cacher(lien);
+  else {
+    montrer(lien); montrerParents(lien);
+    if (!lienCable && typeof lien.onClick === 'function') { lienCable = true; lien.onClick(ouvrirJumelage); }
+  }
   if (liste.length && remplirTableau(liste)) return;
   cacher(premier(IDS_TABLE_JUMELAGES));
   if (liste.length) console.warn('[LPC][AdminProfil] #tableJumelage introuvable : jumelages non affichés');
 }
-let titreCable = false;
+let lienCable = false;
 // ─── statut d'un membre qui n'en a pas (08/10) ───────────────────────────
 // #dropdownStatut (élément de la PAGE, replié par défaut) apparaît seulement pour un membre SANS statut : l'admin le définit, il est
 // envoyé à l'enregistrement. Le serveur ne l'accepte que si le membre n'a toujours aucun statut.
