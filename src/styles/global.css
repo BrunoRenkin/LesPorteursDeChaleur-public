@@ -57,3 +57,24 @@
 .lpc-saisie .wixui-text-input__label {
   color: #000000 !important;
 }
+
+/* Champ e-mail saisissable (10/10) : le champ de la section globale a, dans l'éditeur, un design propre (bordure grise à 50 %, libellé 14 px, hauteur 48 px)
+   qui le fait paraître désactivé. En création il reprend l'apparence des autres champs texte (bordure noire 0,8 px, coins 3 px, libellé 16 px). */
+.lpc-saisie input,
+.lpc-saisie .wixui-text-input__input {
+  border: 0.8px solid #000000 !important;
+  border-radius: 3px !important;
+}
+.lpc-saisie label,
+.lpc-saisie .wixui-text-input__label {
+  font-size: 16px !important;
+}
+
+/* Tableau des jumelages du porteur (10/10, /adminprofil et /mon-profil) : même police que « Paragraphe 2 » (Wix Madefor Text, 16 px), sans gras.
+   Posée par le code (customClassList) sur #tableJumelage. */
+.lpc-table-jumelage,
+.lpc-table-jumelage * {
+  font-family: 'wix-madefor-text-v2', 'Wix Madefor Text', sans-serif !important;
+  font-size: 16px !important;
+  font-weight: 400 !important;
+}

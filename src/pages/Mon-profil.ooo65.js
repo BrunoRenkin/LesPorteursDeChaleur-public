@@ -52,9 +52,9 @@ const IDS_GLOBAL_A_REPLIER = ['#boxResidents', '#buttonJumelages', '#titreJumela
 const IDS_TABLE_JUMELAGES = ['#tableJumelage'];
 const COLONNES_JUMELAGES = [
   { dataPath: 'nom', label: 'Nom', type: 'string' },
-  { dataPath: 'etablissement', label: 'Établissement', type: 'string' },
-  { dataPath: 'interets', label: "Centres d'intérêt", type: 'string' }
-];
+  { dataPath: 'interets', label: "Centres d'intérêt", type: 'string' },
+  { dataPath: 'etablissement', label: 'Établissement', type: 'string' }
+];   // 10/10 : les deux dernières colonnes inversées (comme /adminprofil)
 // 08/10 : la box est AFFICHÉE ici pour un porteur qui a des jumelages (titre + liste) ; ses boutons restent réservés à /adminprofil
 const IDS_TITRE_JUM = ['#AdmintitreJumelages'];   // les ID sont sensibles à la casse
 const IDS_TEXTE_JUM = ['#AdmintexteJumelages'];   // abandonné : replié
@@ -104,7 +104,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-08-n (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-10-a (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
@@ -280,7 +280,7 @@ function remplirTableau(liste) {
       const actuelles = Array.isArray(tab.columns) ? tab.columns : [];
       const cols = COLONNES_JUMELAGES.map((c, i) => Object.assign({}, actuelles[i] || {}, c));   // largeurs de l'éditeur conservées au départ
       // 08/10 (Bruno) : colonnes = nom du résident, établissement, centres d'intérêt (plus de numéro) ; largeurs fixes demandées : 120 / 220 / 240
-      const LARGEURS = [120, 220, 240];
+      const LARGEURS = [120, 240, 220];   // 10/10 : centres d'intérêt (240) avant l'établissement (220)
       cols.forEach((c, i) => { if (LARGEURS[i]) c.width = LARGEURS[i]; });
       console.log('[LPC] largeurs de #tableJumelage : ' + cols.map((c) => c.width).join(' / ') + ' (éditeur : ' + JSON.stringify(actuelles.map((c) => c && c.width)) + ')');
       tab.columns = cols;
@@ -288,6 +288,7 @@ function remplirTableau(liste) {
       let dp = '?'; try { dp = (tab.columns || []).map((c) => c.dataPath).join(', '); } catch (x) { /* ignoré */ }
       console.warn('[LPC][Profil] colonnes de #tableJumelage non posées (' + (e && e.message) + ') ; dataPath de l\'éditeur : ' + dp);
     }
+    try { if (tab.customClassList) tab.customClassList.add('lpc-table-jumelage'); } catch (e) { console.warn('[LPC][Profil] classe lpc-table-jumelage non posée :', e && e.message); }   // 10/10 : police Paragraphe 2, sans gras (global.css)
     tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), nom: x.nom || '', etablissement: x.organisme || '', interets: x.interets || '' }));
     montrer(tab); montrerParents(tab);
     return true;

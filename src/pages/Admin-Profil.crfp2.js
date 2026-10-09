@@ -1,6 +1,7 @@
 // Code de PAGE « Adminprofil » (/adminprofil) : un administrateur modifie la fiche d'un MEMBRE.
 // Mode « admin » du formulaire générique : la page contient la SECTION GLOBALE de F1 (mêmes ID).
-// version du code : 2026-10-08-j   (08/10 j : box des jumelages = pile de la PAGE #AdminboxResidents > #AdmintitreJumelages + tableau #tableJumelage ; titre = lien vers /adminjumelages ; plus de bouton dans la box)
+// version du code : 2026-10-10-a   (10/10 a : mode création : photo (ajout, vignette, retrait, consentement image) comme en modification, envoyée à la création ; capacités rouvertes explicitement ; tableau des jumelages : colonnes Nom / Centres d'intérêt / Établissement, police et graisse harmonisées (classe lpc-table-jumelage))
+//   (anciennement 2026-10-08-j   (08/10 j : box des jumelages = pile de la PAGE #AdminboxResidents > #AdmintitreJumelages + tableau #tableJumelage ; titre = lien vers /adminjumelages ; plus de bouton dans la box)
 //   (anciennement 2026-10-07-b   (07/10 b : mode création : interface préparée avant l'appel serveur, e-mail rendu saisissable en premier)
 //   (07/10 : MODE CRÉATION /adminprofil?mode=creation : l'admin crée un membre (compte Wix sans mot de passe + fiche Membres) ; e-mail saisissable,
 //    liste #dropdownStatut (Porteur / Accueillant / Partenaire, hors section globale), capacités selon le statut, #checkbox2 = consentement RGPD
@@ -76,9 +77,9 @@ const IDS_TITRE_JUMELAGES = ['#AdmintitreJumelages'];   // les ID sont sensibles
 const IDS_TEXTE_JUMELAGES = ['#AdmintexteJumelages'];   // abandonné : replié
 const COLONNES_JUMELAGES = [
   { dataPath: 'nom', label: 'Nom', type: 'string' },
-  { dataPath: 'etablissement', label: 'Établissement', type: 'string' },
-  { dataPath: 'interets', label: "Centres d'intérêt", type: 'string' }
-];
+  { dataPath: 'interets', label: "Centres d'intérêt", type: 'string' },
+  { dataPath: 'etablissement', label: 'Établissement', type: 'string' }
+];   // 10/10 (Bruno) : les deux dernières colonnes inversées
 const STATUTS_PAR_DEFAUT = ['Porteur', 'Accueillant', 'Partenaire'];   // repli si le serveur n'envoie pas `statutOptions` (backend ancien) ; le serveur valide
 const IDS_BTN_ORGANISATION = ['#btnorganisation', '#btnOrganisation'];   // réservé à /mon-profil : replié ici
 const IDS_BTN_EMAIL = ['#buttonSendToPorteur'];
@@ -118,6 +119,7 @@ const PAGE_APRES_CREATION = '/admin?onglet=membres';
 let d = {};
 let aPhoto = false;   // le membre a une photo enregistrée (sinon la case de consentement image est repliée)
 let photoASupprimer = false;   // retrait demandé, appliqué à l'enregistrement
+let photoCreation = null;   // 10/10 : mode création : photo déjà téléversée { url, w, h } (téléversement dès le choix du fichier, pour afficher la vignette)
 let rangeeConsentement = null;   // rangée de la case de consentement image, repliée tant qu'il n'y a ni photo ni fichier choisi
 let ticket = '';
 let statutPropose = false;   // 08/10 : #dropdownStatut affiché en modification (membre SANS statut) : sa valeur est envoyée à l'enregistrement
@@ -125,7 +127,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-09-c', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-10-a', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -204,7 +206,7 @@ async function initCreation() {
   safe('titre', () => { const t = premier(TITRE_ADMIN); if (t) t.text = 'Nouveau membre'; });
   safe('bouton', () => { const b = optionnel(EL.bouton); if (b && 'label' in b) b.label = 'Créer le membre'; });
   safe('vignette : rien à afficher', () => vignette(''));   // replie la rangée du consentement image
-  safe('pas de photo à la création', () => cacher(optionnel(EL_PHOTO.envoi)));   // ajoutée ensuite par « Modifier »
+  safe('photo : téléversement et retrait', () => { cablerPhoto(); montrerParents(optionnel(EL_PHOTO.envoi)); });   // 10/10 : photo possible dès la création (téléversée au choix du fichier, enregistrée à « Créer le membre »)
   safe('e-mail saisissable', () => {
     const el = premier(EMAIL_IDS);
     if (!el) { console.warn('[LPC][AdminProfil] champ e-mail introuvable (' + EMAIL_IDS.join(', ') + ')'); return; }
@@ -237,7 +239,12 @@ async function initCreation() {
     $w(EL.disponibilites).options = (d.disponibiliteOptions || []).map((v) => ({ label: v, value: v }));
     setVal(EL.disponibilites, []);
   });
-  safe('capacités : toutes proposées dès l’ouverture (09/10)', () => { $w(EL.capacites).options = (d.capaciteOptions || []).map((v) => ({ label: v, value: v })); setVal(EL.capacites, []); });
+  safe('capacités : toutes proposées dès l’ouverture (09/10)', () => {
+    const caps = $w(EL.capacites);
+    caps.options = (d.capaciteOptions || []).map((v) => ({ label: v, value: v }));
+    setVal(EL.capacites, []);
+    montrer(caps); montrerParents(caps);   // 10/10 : la pile des capacités est réaffichée explicitement (conteneur masqué ou replié)
+  });
   safe('champ nbResidentsMax', () => {
     preparerNbResidents(null);
     majNbResidents();
@@ -266,6 +273,7 @@ const MSG_CREATION = {
   'statut-invalide': 'Statut non reconnu : choisissez-en un dans la liste.',
   'consentement-requis': 'Le consentement RGPD doit être recueilli (oralement ou par e-mail) puis la case cochée.',
   'nb-requis': 'Indiquez un nombre de cartes entre 1 et 99.',
+  'photo-invalide': "La photo n'a pas été reconnue : choisissez-en une autre ou retirez-la.",
   'email-existant': 'Un membre avec cette adresse e-mail existe déjà.',
   'wix-refuse': "Wix a refusé de créer le compte (adresse déjà inscrite sur le site sans fiche ?). Si la personne s'est déjà inscrite, sa fiche se créera à sa connexion.",
   'fiche-ko': "Le compte Wix a été créé mais la fiche n'a pas pu être enregistrée : elle se créera à la première connexion du membre (sans statut). Prévenez Bruno.",
@@ -299,6 +307,10 @@ async function sauverCreation() {
       capacites: valeur(EL.capacites),
       disponibilites: valeur(EL.disponibilites),
       nbResidentsMax: nbSaisissable() ? (nombreDe(champNbResidents().value) || undefined) : undefined,
+      photoUrl: photoCreation ? photoCreation.url : undefined,
+      photoW: photoCreation ? photoCreation.w : undefined,
+      photoH: photoCreation ? photoCreation.h : undefined,
+      consentementPhoto: photoCreation ? Boolean((optionnel(EL.consentementPhoto) || {}).checked) : undefined,
     })) || {};
     console.log('[LPC][AdminProfil] création', { ok: res.ok, reason: res.reason, role: res.role, version: res.version });
     if (res.refuse) { wixLocation.to('/'); return; }
@@ -554,7 +566,7 @@ function remplirTableau(liste) {
       const actuelles = Array.isArray(tab.columns) ? tab.columns : [];
       const cols = COLONNES_JUMELAGES.map((c, i) => Object.assign({}, actuelles[i] || {}, c));   // largeurs de l'éditeur conservées au départ
       // 08/10 (Bruno) : colonnes = nom du résident, établissement, centres d'intérêt (plus de numéro) ; largeurs fixes demandées : 120 / 220 / 240
-      const LARGEURS = [120, 220, 240];
+      const LARGEURS = [120, 240, 220];   // 10/10 : centres d'intérêt (240) avant l'établissement (220)
       cols.forEach((c, i) => { if (LARGEURS[i]) c.width = LARGEURS[i]; });
       console.log('[LPC] largeurs de #tableJumelage : ' + cols.map((c) => c.width).join(' / ') + ' (éditeur : ' + JSON.stringify(actuelles.map((c) => c && c.width)) + ')');
       tab.columns = cols;
@@ -562,6 +574,7 @@ function remplirTableau(liste) {
       let dp = '?'; try { dp = (tab.columns || []).map((c) => c.dataPath).join(', '); } catch (x) { /* ignoré */ }
       console.warn('[LPC][AdminProfil] colonnes de #tableJumelage non posées (' + (e && e.message) + ') ; dataPath de l\'éditeur : ' + dp);
     }
+    try { if (tab.customClassList) tab.customClassList.add('lpc-table-jumelage'); } catch (e) { console.warn('[LPC][AdminProfil] classe lpc-table-jumelage non posée :', e && e.message); }   // 10/10 : police Paragraphe 2 (Wix Madefor Text 16 px), sans gras (global.css)
     tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), nom: x.nom || '', etablissement: x.organisme || '', interets: x.interets || '' }));
     montrer(tab); montrerParents(tab);
     return true;
@@ -834,12 +847,14 @@ function cablerPhoto() {
         photoASupprimer = false;                  // un nouvel envoi l'emporte sur un retrait demandé
         if (rangeeConsentement) montrer(rangeeConsentement);   // la case de consentement image doit pouvoir être cochée
         hideErr();
+        if (CREATION) televerserCreation();   // 10/10 : en création, téléversement immédiat pour afficher la vignette
       }
     });
   }
   const retrait = optionnel(EL_PHOTO.retrait);
   if (retrait && typeof retrait.onClick === 'function') {
     retrait.onClick(() => {
+      if (CREATION) { retirerPhotoCreation(); return; }
       photoASupprimer = true;
       tracer('retrait-demande', 'info');
       cacher(optionnel(EL_PHOTO.bloc)); cacher(optionnel(EL_PHOTO.image)); cacher(retrait);
@@ -850,6 +865,29 @@ function cablerPhoto() {
   } else if (aPhoto) {
     console.warn('[LPC][AdminProfil] ' + EL_PHOTO.retrait + ' introuvable : retrait de photo impossible sur cette page');
   }
+}
+/** Mode création (10/10) : téléverse le fichier dès qu'il est choisi, affiche la vignette et la case de consentement image. */
+async function televerserCreation() {
+  const photo = await televerser();
+  if (!photo) return;
+  if (photo.erreur) {
+    photoCreation = null;
+    showErr("Le téléversement de la photo a échoué (format ou taille refusés ?). Réessayez avec un autre fichier.");
+    return;
+  }
+  photoCreation = photo;
+  safe('vignette (création)', () => vignette(photo.url));
+  if (rangeeConsentement) { montrer(rangeeConsentement); montrerParents(rangeeConsentement); }
+}
+/** Mode création : retrait de la photo choisie (rien n'est encore enregistré). */
+function retirerPhotoCreation() {
+  photoCreation = null; aPhoto = false;
+  tracer('retrait-creation', 'info');
+  cacher(optionnel(EL_PHOTO.bloc)); cacher(optionnel(EL_PHOTO.image)); cacher(optionnel(EL_PHOTO.retrait));
+  const c = optionnel(EL.consentementPhoto);
+  if (c && c.checked !== undefined) c.checked = false;
+  try { const up = optionnel(EL_PHOTO.envoi); if (up && typeof up.reset === 'function') up.reset(); } catch (e) { /* ignoré */ }
+  if (rangeeConsentement) cacher(rangeeConsentement);
 }
 /** Téléverse le fichier choisi. Renvoie { url, w, h } ou null (rien à envoyer) ; { erreur } si le téléversement échoue. */
 async function televerser() {

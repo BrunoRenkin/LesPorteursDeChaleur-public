@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-09-b';
+const VERSION = '2026-10-10-a';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -699,8 +699,8 @@ async function creerCompteWix(membre) {
 
 /**
  * payload = { prenom, nom, email, telephone, localite, commentaire, statut, capacites: string[], disponibilites: string[],
- *             nbResidentsMax?, consentementRgpd }
- * Refus renvoyés en { ok: false, reason } : 'donnees-invalides', 'statut-invalide', 'consentement-requis', 'nb-requis',
+ *             nbResidentsMax?, photoUrl?, photoW?, photoH?, consentementPhoto? }   (10/10 : photo facultative, média Wix téléversé par la page)
+ * Refus renvoyés en { ok: false, reason } : 'donnees-invalides', 'statut-invalide', 'consentement-requis', 'nb-requis', 'photo-invalide',
  * 'email-existant' (fiche déjà présente), 'wix-refuse' (compte Wix refusé : adresse déjà inscrite ?), 'fiche-ko'.
  */
 export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload = {}) => {
@@ -724,6 +724,8 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
   statutsDepuisCapacites(capacites).forEach((nom) => { const r = lignesStatuts.find((x) => norm(x.statut) === norm(nom)); if (r) idsStatuts.add(r._id); });
   const nb = nbResidents(payload.nbResidentsMax);
   if (ecritDesCartes(capacites) && nb == null) return { ok: false, reason: 'nb-requis' };
+  const photoUrl = clean(payload.photoUrl, 2000);   // 10/10 : photo facultative
+  if (photoUrl && !photoValide(photoUrl)) return { ok: false, reason: 'photo-invalide' };
 
   const existant = (await wixData.query('Membres').eq('email', email).limit(1).find({ suppressAuth: true })).items[0];
   if (existant) return { ok: false, reason: 'email-existant' };
@@ -742,7 +744,8 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
       localite: clean(payload.localite, 120),
       commentaire: clean(payload.commentaire, 2000),
       consentement_rgpd: true,            // créer la personne vaut consentement (Bruno, 09/10) ; un retrait ultérieur reste à traiter (cas non prévu)
-      consentement_photo: false,
+      consentement_photo: Boolean(photoUrl) && payload.consentementPhoto === true,
+      photo: photoUrl || '',
       abonnement_newsletter: false,
       actif: true,
       wixMemberId: compte._id,
@@ -764,11 +767,26 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
   try { await assignRole(ROLE_MEMBRE_NORMAL, compte._id); } catch (e) { role = false; console.error('[LPC][Admin] assignRole KO :', e && (e.message || e)); }
   await langueDuContact((compte.contact && compte.contact.contactId) || compte.contactId || compte._id);
 
+  // Photo (10/10) : poussée vers le compte Wix pour que members-sync ne la remplace pas à la première connexion
+  let photoWix = 'sans-objet';
+  if (photoUrl) {
+    try {
+      const statique = toStaticImageUrl(photoUrl);
+      if (!statique) throw new Error('adresse de photo non convertible en URL statique');
+      await updateMember(compte._id, { profile: { profilePhoto: { url: statique, width: Number(payload.photoW) > 0 ? Number(payload.photoW) : 400, height: Number(payload.photoH) > 0 ? Number(payload.photoH) : 400 } } });
+      photoWix = 'ok';
+    } catch (e) {
+      photoWix = 'non-poussee';
+      console.warn('[LPC][Admin] création : photo du compte Wix KO :', e && (e.message || e));
+    }
+  }
+
   // Journal : noms des champs, jamais les valeurs ; le statut choisi et l'origine du consentement sont tracés
   await journaliser(admin, 'creer:membres', rowId,
     'champs : prenom, nom, email, telephone, localite, commentaire, capacites, disponibilites, nbResidentsMax · statut : ' + statut.statut
-    + ' · consentement RGPD réputé donné (création à la demande de la personne) · compte Wix créé sans mot de passe (verified = false) · rôle membre : ' + role);
-  return { ok: true, version: VERSION, role };
+    + ' · consentement RGPD réputé donné (création à la demande de la personne) · compte Wix créé sans mot de passe (verified = false) · rôle membre : ' + role
+    + (photoUrl ? ' · photo ajoutée (consentement image : ' + (payload.consentementPhoto === true) + ') · photo Wix : ' + photoWix : ''));
+  return { ok: true, version: VERSION, role, photoWix };
 });
 
 /**
