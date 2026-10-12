@@ -106,7 +106,7 @@ const COLONNES_JUM = [
 ];
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-e (organismeAdresse ; case du logo non grisée)');
+  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-f (messages dans #messageErreur ; traces de l’enregistrement ; organismeAdresse ; case du logo non grisée)');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminOrganisme'));
   safe('masquage erreur', hideErr);
@@ -165,7 +165,7 @@ $w.onReady(async () => {
     version: d.version, capacites: (d.capaciteOptions || []).length, types: (d.typeOptions || []).length,
   });
 
-  remplir();
+  safe('préremplissage', remplir);   // 12/10 : une erreur ici ne doit pas empêcher de câbler le bouton Enregistrer
   safe('jumelages de l’organisme', afficherJumelagesOrganisme);
   safe('logo', () => initLogo((d.organisation || {}).logoUrl, (d.organisation || {}).consentementLogo));
   activerBouton();
@@ -580,6 +580,12 @@ function typeChoisi() {
 
 async function sauver() {
   hideErr();
+  safe('trace du clic', () => {
+    const up = boutonLogo();
+    const c = premierPresent(LOGO_CONSENT_IDS);
+    console.log('[LPC][AdminOrganisme] clic Enregistrer', { boutonLogo: up ? '#' + up.id : 'introuvable', fichiers: up && up.value ? up.value.length : 0,
+      caseLogo: c ? '#' + c.id : 'introuvable', cochee: c ? c.checked : null, messageErreur: Boolean(optionnel(EL.erreur)) });
+  });
   const nom = (valeur(ID.organisme) || '').trim();
   if (!nom) { showErr("Merci d'indiquer le nom de l'organisme."); return; }
   if (!typeChoisi()) { showErr("Merci de choisir le type de l'organisme."); return; }
@@ -587,7 +593,7 @@ async function sauver() {
 
   desactiverBouton();
   let logoUrl = '';
-  try { logoUrl = await televerserLogo(); }
+  try { logoUrl = await televerserLogo(); console.log('[LPC][AdminOrganisme] logo téléversé :', Boolean(logoUrl)); }
   catch (e) {
     console.error('[LPC][AdminOrganisme] upload logo KO:', e);
     showErr(MSG_LOGO_ECHEC);
@@ -635,8 +641,8 @@ function escapeHtml(s) {
   return String(s == null ? '' : s)
     .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
-/** Message d'erreur : #errorText de la section Navigation, à défaut #messageErreur de la page. */
-function elErreur() { return premier(IDS_ERREUR) || optionnel(EL.erreur); }
+/** Message d'erreur : #messageErreur de la page (près du formulaire, 12/10, demande de Bruno), à défaut #errorText de la section Navigation. */
+function elErreur() { return optionnel(EL.erreur) || premier(IDS_ERREUR); }
 function showErr(msg, couleur) {
   console.warn('[LPC][AdminOrganisme] message :', msg);
   const e = elErreur();
@@ -646,6 +652,7 @@ function showErr(msg, couleur) {
     else if (e.text !== undefined) e.text = msg;
     if (e.expand) e.expand();
     if (e.show) e.show();
+    try { if (typeof e.scrollTo === 'function') e.scrollTo(); } catch (x) { /* ignoré */ }
   } catch (err) {
     console.error('[LPC][AdminOrganisme] affichage du message KO :', err);
   }
