@@ -1,5 +1,5 @@
 // Code de PAGE « Adminjumelage » (/adminjumelages) : jumelage MANUEL porteur <-> résident, par un administrateur.
-// version du code : 2026-10-07-a   (07/10 : « Centres d'intérêt » et « Infos importantes » tronqués à 60 caractères à l'affichage ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes » ; ordre Centres d'intérêt, Infos importantes ;
+// version du code : 2026-10-12-a   (12/10 : bouton Jumelage de la navigation fonctionne depuis la liste d'un porteur ; 07/10 : « Centres d'intérêt » et « Infos importantes » tronqués à 60 caractères à l'affichage ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes » ; ordre Centres d'intérêt, Infos importantes ;
 //   #c8 masqué ; Résident -> lien vers /adminresidents, Institution -> lien vers /adminorganisme)
 //
 // Page « Membres uniquement » : le contrôle réel est dans le backend (backend/admin.web.js -> backend/lpc-acces.js). Aucune
@@ -27,7 +27,7 @@ import wixWindowFrontend from 'wix-window-frontend';
 const TEXTE_LIBRE = ['interets', 'infosimportantes'];   // 07/10 : cellules de texte libre tronquées à l'affichage (2 lignes maximum)
 const LONGUEUR_MAX_CELLULE = 60;
 const coupe = (id, t) => (TEXTE_LIBRE.includes(id) && t.length > LONGUEUR_MAX_CELLULE ? t.slice(0, LONGUEUR_MAX_CELLULE - 1).trimEnd() + '…' : t);
-const VERSION = '2026-10-09-a';   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
+const VERSION = '2026-10-12-a';   // 12/10 : bouton « Jumelage » depuis une liste de porteur ou d'organisme = même page, tous les résidents (en place) ;   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
 const NB_CELLULES = 10;
 const COULEUR_ERREUR = '#C0392B';
 const CLASSE_TEXTE = 'font_8';
@@ -77,6 +77,10 @@ $w.onReady(async () => {
   safe('mode', () => { tous = String((wixLocation.query || {}).tous || '') === '1'; console.log('[LPC][AdminJumelage] mode :', tous ? 'tous les résidents' : 'ticket'); });
   safe('masquage initial', () => { IDS_SANS_OBJET.forEach((id) => cacher(optionnel(id))); cacher(premier(IDS_TEXTE_EMAIL)); hideErr(); });
   safe('navigation vers les listes', cablerNavigationAdmin);
+  // 12/10 : Wix ne rejoue pas onReady quand seule la chaîne de requête change (même page) : le lien du bouton « Jumelage » est suivi ici
+  safe('changement d’adresse', () => wixLocation.onChange(() => {
+    if (String((wixLocation.query || {}).tous || '') === '1') versTous();
+  }));
   if (!authentication.loggedIn()) { wixLocation.to('/participer'); return; }
 
   // Arrivée par le lien « Jumelés : N » du titre de /adminorganisme (?depuis=organisme) : le serveur ouvre les résidents de l'organisme
@@ -107,6 +111,20 @@ $w.onReady(async () => {
 
   await charger(true);
 });
+
+/**
+ * Bouton « Jumelage » de la navigation (12/10) : depuis la liste d'un porteur (#SelectPorteur désactivé) ou d'un organisme, on revient à la
+ * MÊME page avec TOUS les résidents. Wix ne recharge pas une page quand seule la chaîne de requête change (onReady n'est pas rejoué) :
+ * `wixLocation.to` ne faisait donc rien ; le changement de mode se fait ici, en place.
+ */
+function versTous() {
+  if (tous) return;   // déjà la liste de tous les résidents (le bouton est câblé deux fois : anti-doublon)
+  tous = true;
+  porteurChoisi = AUCUN;
+  filtre = 'tous';
+  console.log('[LPC][AdminJumelage] navigation : tous les résidents (même page, sans rechargement)');
+  charger();
+}
 
 /** Charge l'état depuis le serveur et le peint. premier = true : première arrivée sur la page. */
 async function charger(premiereFois) {
@@ -173,7 +191,10 @@ function peindreSelect() {
   const choisi = d.selection ? d.selection.id : AUCUN;
   porteurChoisi = choisi;
   s.value = choisi;
-  try { if (d.porteurFixe && typeof s.disable === 'function') s.disable(); } catch (e) { /* ignoré */ }
+  try {
+    if (d.porteurFixe && typeof s.disable === 'function') s.disable();
+    else if (!d.porteurFixe && typeof s.enable === 'function') s.enable();   // 12/10 : réactivée en passant à « tous les résidents »
+  } catch (e) { /* ignoré */ }
   montrer(s);
 }
 
@@ -499,7 +520,7 @@ function cablerNavigationAdmin() {
     const url = n.url || '/admin?onglet=' + n.cle;
     montrer(b);
     try { b.link = url; } catch (e) { /* repli sur le clic */ }
-    if (typeof b.onClick === 'function') b.onClick(() => wixLocation.to(url));
+    if (typeof b.onClick === 'function') b.onClick(() => { if (n.url === URL_JUMELAGES) versTous(); else wixLocation.to(url); });
     peindreNav(b, n.cle === NAV_ACTIF);
   });
   // Diagnostic (02/10) : boutons de la page avec leur lien d'éditeur, pour repérer le bouton « Jumelage » s'il n'est pas reconnu
@@ -507,7 +528,7 @@ function cablerNavigationAdmin() {
   // Tout bouton dont le lien d'éditeur pointe encore vers /mes-residents (ancien bouton « Résidents » devenu « Jumelage ») est redirigé
   boutons.filter((x) => { try { return /mes-residents/i.test(String(x.link || '')); } catch (e) { return false; } }).forEach((b) => {
     try { b.link = URL_JUMELAGES; } catch (e) { /* repli sur le clic */ }
-    if (typeof b.onClick === 'function') b.onClick(() => wixLocation.to(URL_JUMELAGES));
+    if (typeof b.onClick === 'function') b.onClick(() => versTous());
     console.log('[LPC] bouton #' + b.id + ' (lien /mes-residents) redirigé vers ' + URL_JUMELAGES);
   });
 }
@@ -583,7 +604,7 @@ function cablerJumelages() {
     return;
   }
   try { b.link = URL; } catch (e) { console.warn('[LPC][nav] lien non posé sur #' + b.id + ' :', e && e.message); }
-  if (typeof b.onClick === 'function') b.onClick(() => wixLocation.to(URL));
+  if (typeof b.onClick === 'function') b.onClick(() => versTous());
   try { if (b.show) b.show(); } catch (e) { /* ignoré */ }
   console.log('[LPC][nav] bouton « Jumelage » câblé : #' + b.id + ' (' + b.type + ') → ' + URL);
 }

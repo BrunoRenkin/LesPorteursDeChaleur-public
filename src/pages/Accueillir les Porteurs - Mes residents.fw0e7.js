@@ -23,7 +23,7 @@ import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import { getMesResidents, enregistrerMesResidents } from 'backend/residents.web';
 
-const VERSION = '2026-10-06-e';   // 06/10 (c) : #btnAjouter devient « Supprimer » sur les résidents déjà encodés non jumelés ; #NomPorteur si jumelé
+const VERSION = '2026-10-12-a';   // 06/10 (c) : #btnAjouter devient « Supprimer » sur les résidents déjà encodés non jumelés ; #NomPorteur si jumelé
 
 // ↓↓↓ SEULE LIGNE DIFFÉRENTE ENTRE LES DEUX PAGES ↓↓↓
 const PARCOURS = 'creation';   // 'mon-profil' (/mes-residents) | 'creation' (/accueillir-les-porteurs-mes-residents)
@@ -45,11 +45,13 @@ const LIGNE = {
   chambre: ['#rChambre', '#chambre', '#Chambre', '#nChambre'],
   infos: ['#infosimportantes', '#informationsimportantes', '#infosImportantes', '#rInfosImportantes'],
   nomPorteur: ['#NomPorteur', '#nomPorteur', '#rNomPorteur'],   // « Prénom I. » du porteur jumelé (lecture seule)
+  tooltip: ['#Tooltip', '#tooltip'],   // 12/10 : info-bulle d'un résident jumelé (non supprimable)
   interets: ['#rInterets', '#interets', '#Interets', '#nInterets'],
   actif: ['#rActif', '#actif', '#Actif'],
   ajouter: ['#btnAjouter', '#ajouterResident', '#boutonAjouter', '#ajouter'],
 };
 
+const TEXTE_TOOLTIP = 'Ce résident a été attribué à un porteur qui lui écrira une carte';
 const ONGLET_ACTIF = { fond: '#C0392B', texte: '#FFFFFF' };
 const ONGLET_INACTIF = { fond: '#FFFFFF', texte: '#C0392B' };
 
@@ -201,7 +203,18 @@ function remplirLigne($item, r) {
       montrer(np);
     } else cacher(np);
   }
-  const absents = ['prenom', 'initiale', 'chambre', 'infos', 'interets', 'ajouter', 'nomPorteur'].filter((k) => !el(k));
+  // 12/10 : info-bulle sur un résident jumelé (qu'on ne peut pas supprimer) ; masquée sinon. Le texte est posé par le code si l'élément l'accepte.
+  const tt = el('tooltip');
+  if (tt) {
+    if (jumele) {
+      let pose = false;
+      ['text', 'content', 'value', 'label'].forEach((p) => { if (pose) return; try { if (p in tt) { tt[p] = TEXTE_TOOLTIP; pose = true; } } catch (e) { /* suivant */ } });
+      if (!pose) { try { if ('html' in tt) { tt.html = '<p>' + TEXTE_TOOLTIP + '</p>'; pose = true; } } catch (e) { /* ignoré */ } }
+      if (!pose) console.warn('[LPC][Residents] #Tooltip : aucune propriété de texte reconnue (type ' + tt.type + ') : écrire le texte dans l’éditeur');
+      montrer(tt);
+    } else cacher(tt);
+  }
+  const absents = ['prenom', 'initiale', 'chambre', 'infos', 'interets', 'ajouter', 'nomPorteur'].concat(jumele ? ['tooltip'] : []).filter((k) => !el(k));
   if (absents.length) console.warn('[LPC][Residents] ligne du répéteur : ID introuvables :', absents.join(', '));
 }
 

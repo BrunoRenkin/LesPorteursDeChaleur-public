@@ -104,13 +104,14 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-10-b (formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-12-a (titre « Mon profil » toujours visible ; formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
   // Onglets, consentement RGPD, champ « nombre de cartes » masqués d'emblée, avant tout appel serveur
   safe('masquage initial', () => {
-    cacher(pileOnglets()); cacher(boiteOnglets()); cacher(boutonResidents());
+    // 12/10 : la boîte et la pile d'onglets restent visibles (le titre « Mon profil » y est) ; seuls les onglets Organisme et Résidents sont masqués d'emblée
+    cacher(optionnel(EL_ONGLETS.ongletOrganisme)); cacher(boutonResidents());
     cacher(optionnel(EL.consentement));
     cacher(premier(BOX_ADMIN));          // box des jumelages : réaffichée par afficherJumelages() pour un porteur jumelé
     IDS_GLOBAL_A_REPLIER.forEach((id) => cacher(optionnel(id)));
@@ -151,15 +152,14 @@ function ongletsVisibles(profil, organisation) {
   const aUneOrganisation = Boolean(organisation);
   // 08/10 : un Accueillant ou un Partenaire voit l'onglet Organisme même SANS organisation (il peut en créer une) ; Résidents : organisation requise
   const afficher = aUneOrganisation || aUnStatut;
+  // 12/10 : la boîte et la pile restent TOUJOURS visibles : le titre « Mon profil » s'y trouve et disparaissait pour un simple porteur.
+  // Seul l'onglet Organisme suit la règle d'affichage.
   const boite = boiteOnglets();
   const pile = pileOnglets();
-  if (boite || pile) {
-    [pile, boite].forEach((el) => { if (!el) return; if (afficher) montrer(el); else cacher(el); });
-  } else {
-    console.warn("[LPC][Profil] boîte d'onglets introuvable (" + BOITE_ONGLETS.join(', ') + ')');
-    const onglet = optionnel(EL_ONGLETS.ongletOrganisme);
-    if (afficher) montrer(onglet); else cacher(onglet);
-  }
+  [pile, boite].forEach((el) => { if (el) montrer(el); });
+  if (!boite && !pile) console.warn("[LPC][Profil] boîte d'onglets introuvable (" + BOITE_ONGLETS.join(', ') + ')');
+  const ongletOrg = optionnel(EL_ONGLETS.ongletOrganisme);
+  if (afficher) montrer(ongletOrg); else cacher(ongletOrg);
   const ongletRes = boutonResidents();
   if (ongletRes) {
     peindre(ongletRes, ONGLET_INACTIF);

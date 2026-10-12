@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-10-c';
+const VERSION = '2026-10-12-a';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -189,6 +189,7 @@ async function lignesMembres() {
       cartes: cartes ? `${encours} / ${max || '?'}` : '',
       ...dates(m),
       _jum: encours,
+      _max: cartes ? max : 0,   // 12/10 : cartes promises (somme affichée dans #CompteurCartes de /admin)
       emailNonVerifie,
       filtres: [...statuts, cartes ? 'Écrit des cartes' : '', cartes && encours < max ? 'Non jumelés' : '', emailNonVerifie ? LIB_NON_VERIFIE : ''].filter(Boolean),
     };
@@ -278,13 +279,15 @@ async function lignesFiltrees(params = {}) {
   const gardees = lignes.filter((l) => {
     if (filtre !== TOUS && !l.filtres.some((f) => sansAccents(f) === filtre)) return false;
     if (!q) return true;
-    const meule = sansAccents(Object.entries(l).filter(([k]) => k !== '_id' && k !== '_jum' && k !== 'filtres' && k !== 'cree' && k !== 'modifie' && k !== 'nonValide' && k !== 'emailNonVerifie').map(([, v]) => v).join(' '));
+    const meule = sansAccents(Object.entries(l).filter(([k]) => k !== '_id' && k !== '_jum' && k !== 'filtres' && k !== 'cree' && k !== 'modifie' && k !== 'nonValide' && k !== 'emailNonVerifie' && k !== '_max').map(([, v]) => v).join(' '));
     return q.split(/\s+/).every((mot) => meule.includes(mot));
   });
   gardees.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
   // Totaux de la liste filtrée : nombre de jumelages en cours (affiché « X membres et Y jumelages »)
   const jumelages = gardees.reduce((n, l) => n + (l._jum || 0), 0);
-  return { onglet, options, totaux: { jumelages }, lignes: gardees.map(({ filtres, _jum, ...reste }) => reste) };
+  // 12/10 : cartes promises = somme des « nombre de cartes » des porteurs de la liste filtrée (onglet Membres)
+  const cartes = gardees.reduce((n, l) => n + (l._max || 0), 0);
+  return { onglet, options, totaux: { jumelages, cartes }, lignes: gardees.map(({ filtres, _jum, _max, ...reste }) => reste) };
 }
 
 /** Vrai/faux pour l'affichage du lien « Admin » : aucune donnée, aucun journal. */
@@ -1304,7 +1307,7 @@ export const adminAnnulerJumelage = webMethod(Permissions.SiteMember, async (p =
 // site (envoi à des tiers payant, décision du 22/09) et l'administrateur relit avant d'envoyer.
 // Disponible seulement quand le QUOTA du porteur est REMPLI (jumelages proposés ou actifs >= nbResidentsMax), recontrôlé ici.
 // Contenu : pour chaque résident jumelé, prénom + initiale, établissement (+ localité), centres d'intérêt. JAMAIS les données de santé
-// (indicateur_a, indicateur_b) ni la chambre : un porteur ne les reçoit pas.
+// (indicateur_a, indicateur_b) ni infosimportantes : un porteur ne les reçoit pas. Le numéro de chambre est repris depuis le 12/10 (demande de Bruno).
 // Texte destiné à un tiers : pas de tiret cadratin, pas de point final sur les puces (règles de rédaction externe).
 // TEXTE DE BRUNO (04/10), tutoiement, variantes SINGULIER / PLURIEL selon le nombre de résidents jumelés. Rédigé à la voix de l’équipe (signature, adresse de dépôt).
 // Règles de rédaction externe : pas de tiret cadratin, pas de point final sur les puces.
@@ -1380,6 +1383,8 @@ async function composerEmailPorteur(admin, porteurId) {
     lignes.push('');
     lignes.push((i + 1) + '. ' + nomResident(r));
     if (lieu) lignes.push('   Établissement : ' + lieu);
+    const chambre = clean(r.numero_chambre, 5);
+    if (chambre) lignes.push('   Chambre : ' + chambre);
     lignes.push("   Centres d'intérêt : " + (interets || 'non renseignés'));
   });
   lignes.push('');
