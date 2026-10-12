@@ -1,5 +1,5 @@
 // Code de PAGE « Adminjumelage » (/adminjumelages) : jumelage MANUEL porteur <-> résident, par un administrateur.
-// version du code : 2026-10-12-b   (12/10 b : totaux du site dans #TotauxMembresetJumelage (mode tous) ; 12/10 : bouton Jumelage de la navigation fonctionne depuis la liste d'un porteur ; 07/10 : « Centres d'intérêt » et « Infos importantes » tronqués à 60 caractères à l'affichage ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes » ; ordre Centres d'intérêt, Infos importantes ;
+// version du code : 2026-10-12-c   (12/10 c : montrerParents défini ; 12/10 b : totaux du site dans #TotauxMembresetJumelage (mode tous) ; 12/10 : bouton Jumelage de la navigation fonctionne depuis la liste d'un porteur ; 07/10 : « Centres d'intérêt » et « Infos importantes » tronqués à 60 caractères à l'affichage ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes » ; ordre Centres d'intérêt, Infos importantes ;
 //   #c8 masqué ; Résident -> lien vers /adminresidents, Institution -> lien vers /adminorganisme)
 //
 // Page « Membres uniquement » : le contrôle réel est dans le backend (backend/admin.web.js -> backend/lpc-acces.js). Aucune
@@ -27,7 +27,7 @@ import wixWindowFrontend from 'wix-window-frontend';
 const TEXTE_LIBRE = ['interets', 'infosimportantes'];   // 07/10 : cellules de texte libre tronquées à l'affichage (2 lignes maximum)
 const LONGUEUR_MAX_CELLULE = 60;
 const coupe = (id, t) => (TEXTE_LIBRE.includes(id) && t.length > LONGUEUR_MAX_CELLULE ? t.slice(0, LONGUEUR_MAX_CELLULE - 1).trimEnd() + '…' : t);
-const VERSION = '2026-10-12-b';   // 12/10 (b) : totaux du site en mode « tous les résidents » ;   // 12/10 : bouton « Jumelage » depuis une liste de porteur ou d'organisme = même page, tous les résidents (en place) ;   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
+const VERSION = '2026-10-12-c';   // 12/10 (c) : montrerParents défini (publication refusée en -b : no-undef) ;   // 12/10 (b) : totaux du site en mode « tous les résidents » ;   // 12/10 : bouton « Jumelage » depuis une liste de porteur ou d'organisme = même page, tous les résidents (en place) ;   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
 const NB_CELLULES = 10;
 const COULEUR_ERREUR = '#C0392B';
 const CLASSE_TEXTE = 'font_8';
@@ -577,7 +577,20 @@ async function peindreTotauxSite() {
     catch (x) { console.warn('[LPC][AdminJumelage] adminTotaux KO :', x && x.message); }
   }
   if (!totauxSite) return;
-  try { e.text = texteTotaux(totauxSite); montrer(e); if (typeof montrerParents === 'function') montrerParents(e); } catch (x) { console.warn('[LPC][AdminJumelage] totaux KO :', x && x.message); }
+  try { e.text = texteTotaux(totauxSite); montrer(e); montrerParents(e); } catch (x) { console.warn('[LPC][AdminJumelage] totaux KO :', x && x.message); }
+}
+
+/** Réaffiche les conteneurs masqués ou repliés au-dessus d'un élément (jusqu'à la section). */
+function montrerParents(el) {
+  try {
+    let x = el && el.parent;
+    for (let i = 0; x && i < 6; i++) {
+      const id = String(x.id || '');
+      if (/^(section|page|masterpage)/i.test(id)) break;
+      if (x.hidden === true || x.collapsed === true) montrer(x);
+      x = x.parent;
+    }
+  } catch (e) { /* ignoré */ }
 }
 
 function safe(label, fn) {
