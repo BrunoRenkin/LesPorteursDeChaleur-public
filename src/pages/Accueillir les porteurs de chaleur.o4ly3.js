@@ -29,11 +29,18 @@ const EL = {
   erreur: '#messageErreur',                     // Texte affichant les messages d'erreur
 };
 
+// Logo de l'organisation (12/10) : bouton de téléversement ajouté par Bruno ; ID non connus du code -> candidats, puis le seul UploadButton de la page.
+// Aperçu du logo déjà enregistré et bouton de retrait : FACULTATIFS.
+const LOGO_UPLOAD_IDS = ['#uploadLogo', '#uploadButtonLogo', '#logoUpload', '#logo', '#uploadButton1'];
+const LOGO_APERCU_IDS = ['#logoActuel', '#imageLogo', '#logoApercu', '#apercuLogo'];
+const LOGO_RETRAIT_IDS = ['#retirerLogo', '#supprimerLogo', '#btnRetirerLogo', '#buttonRetirerLogo'];
+let logoASupprimer = false;
+
 const PAGE_MERCI = '/accueillir-les-porteurs-mes-residents';
 const SOUHAITS_OBLIGATOIRES = true;   // >= 1 case cochee exigee
 
 $w.onReady(async () => {
-  console.log('[LPC][F2] version du code : 2026-10-08-a');
+  console.log('[LPC][F2] version du code : 2026-10-12-a (logo de l’organisation)');
   console.log('[LPC][F2] champs obligatoires', { souhaits: SOUHAITS_OBLIGATOIRES });
   // Masquer l'erreur AVANT tout appel réseau (sinon elle reste visible si la suite échoue)
   safe('masquage erreur', hideErr);
@@ -104,6 +111,7 @@ $w.onReady(async () => {
     safe('souhaits issus du profil', () => setVal(EL.capacites, d.capacites));
   }
   console.log('[LPC][F2] organisation chargée', { orgExiste: Boolean(d.orgExiste), nomOrigine, type: d.organismeType });
+  safe('logo existant', () => afficherLogoExistant(d.logoUrl));
 
   // consentement RGPD : jamais pré-coché (consentement actif à chaque envoi)
 
@@ -165,6 +173,24 @@ $w.onReady(async () => {
     }
 
     bouton.disable();
+
+    // Téléversement du logo (si un fichier est en attente). En cas d'échec on interrompt : le logo ne doit pas se perdre en silence.
+    let logoUrl = '';
+    try {
+      const up = boutonLogo();
+      if (up && up.value && up.value.length > 0) {
+        const files = await up.uploadFiles();
+        console.log('[LPC][F2][logo] uploadFiles ->', JSON.stringify(files));
+        if (files && files.length) logoUrl = files[0].fileUrl || files[0].url || '';
+        if (!logoUrl) throw new Error('uploadFiles sans adresse');
+      }
+    } catch (e) {
+      console.error('[LPC][F2] upload logo KO:', e);
+      showErr('Le téléversement du logo a échoué. Merci de réessayer, ou de retirer le fichier pour envoyer le formulaire sans logo.');
+      bouton.enable();
+      return;
+    }
+
     try {
       const res = await submitAccueillant({
         prenom: valeur(EL.prenom),
@@ -178,10 +204,15 @@ $w.onReady(async () => {
         capacites: valeur(EL.capacites),
         commentaire: valeur(EL.commentaire),
         consentement: coche(EL.consentement),
+        logoUrl,
+        supprimerLogo: logoASupprimer,
       });
       console.log('[LPC][F2] réponse du serveur', res, '| alerte interne :', res && res.notify);
       if (res && res.ok) {
         wixLocation.to(PAGE_MERCI);
+      } else if (res && res.reason === 'logo-invalide') {
+        showErr('Le logo n’a pas été accepté : merci de choisir une image (PNG, JPG ou WebP).');
+        bouton.enable();
       } else {
         showErr('L\'envoi a échoué, merci de réessayer dans un instant.');
         bouton.enable();
@@ -304,6 +335,52 @@ function checkIds() {
     } catch (e) { /* type non supporté, on ignore */ }
   }
   else console.log('[LPC][F2] tous les éléments sont présents');
+}
+
+// ─── logo de l'organisation (12/10) ──────────────────────────────────────
+/** Le bouton de téléversement du logo : ID candidats (doit exposer uploadFiles), sinon l'unique UploadButton de la page. */
+function boutonLogo() {
+  for (const id of LOGO_UPLOAD_IDS) {
+    try { const e = $w(id); if (e && typeof e.uploadFiles === 'function') return e; } catch (err) { /* suivant */ }
+  }
+  try {
+    const tous = $w('UploadButton');
+    if (tous && tous.length === 1) {
+      console.warn('[LPC][F2] bouton du logo : ID connus introuvables, repli sur le seul UploadButton de la page, #' + tous[0].id);
+      return tous[0];
+    }
+    if (tous && tous.length) console.error('[LPC][F2] plusieurs UploadButton, aucun ID de logo reconnu :', tous.map((b) => '#' + b.id).join(', '));
+  } catch (e) { /* type non supporté */ }
+  return null;
+}
+function premierPresent(ids) {
+  for (const id of ids) {
+    try { const e = $w(id); if (e && typeof e.type === 'string') return e; } catch (err) { /* suivant */ }
+  }
+  return null;
+}
+/** Aperçu du logo déjà enregistré (élément Image facultatif) et bouton de retrait (facultatif). */
+function afficherLogoExistant(url) {
+  const up = boutonLogo();
+  console.log('[LPC][F2] logo : bouton de téléversement', up ? '#' + up.id : 'INTROUVABLE', '| logo enregistré :', Boolean(url));
+  const apercu = premierPresent(LOGO_APERCU_IDS);
+  const retrait = premierPresent(LOGO_RETRAIT_IDS);
+  if (!url) {
+    if (apercu) { try { apercu.hide(); if (apercu.collapse) apercu.collapse(); } catch (e) { /* ignoré */ } }
+    if (retrait) { try { retrait.hide(); if (retrait.collapse) retrait.collapse(); } catch (e) { /* ignoré */ } }
+    return;
+  }
+  if (apercu) {
+    try { apercu.src = url; if (apercu.alt !== undefined) apercu.alt = 'Logo actuel'; if (apercu.expand) apercu.expand(); apercu.show(); } catch (e) { console.warn('[LPC][F2] aperçu du logo KO :', e && e.message); }
+  }
+  if (retrait && typeof retrait.onClick === 'function') {
+    try { if (retrait.expand) retrait.expand(); retrait.show(); } catch (e) { /* ignoré */ }
+    retrait.onClick(() => {
+      logoASupprimer = true;
+      if (apercu) { try { apercu.hide(); if (apercu.collapse) apercu.collapse(); } catch (e) { /* ignoré */ } }
+      try { retrait.hide(); if (retrait.collapse) retrait.collapse(); } catch (e) { /* ignoré */ }
+    });
+  }
 }
 
 // ─── e-mail (lecture seule, ajout du 26/09) ──────────────────────────────

@@ -191,6 +191,7 @@ export const getMyAccueillantData = webMethod(Permissions.SiteMember, async () =
         nombreDestinataires: org.nombre_destinataires == null ? '' : String(org.nombre_destinataires),
         capacites: (org.capacites || []).map((r) => r && r.capacite).filter(Boolean),
         commentaire: fromRichText(org.commentaire),
+        logoUrl: typeof org.logo === 'string' ? org.logo : '',   // 12/10 : logo de l'organisation (champ Image `logo`)
       });
     }
   }
@@ -207,7 +208,9 @@ export const getMyAccueillantData = webMethod(Permissions.SiteMember, async () =
  * payload = { prenom, nom, telephone, fonction,
  *             organismeType: string, organisme: string, organismeLocalite: string,
  *             nombreDestinataires: string|number, capacites: string[], commentaire: string,
- *             consentement: boolean }
+ *             consentement: boolean,
+ *             logoUrl?: string,         // 12/10 : URI Wix Media (wix:image://…) du logo téléversé par la page (uploadFiles)
+ *             supprimerLogo?: boolean } // retire le logo déjà enregistré (ignoré si logoUrl est fourni)
  */
 export const submitAccueillant = webMethod(Permissions.SiteMember, async (payload = {}) => {
   const member = await currentMember.getMember({ fieldsets: ['FULL'] });
@@ -226,6 +229,13 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
   const nbRaw = parseInt(String(payload.nombreDestinataires ?? '').replace(/\s/g, ''), 10);
   const nombre = Number.isFinite(nbRaw) && nbRaw >= 0 ? nbRaw : null;
   if (!organisme) return { ok: false, reason: 'organisme-requis' };
+  // Logo (12/10) : seule une image Wix Media est acceptée (le champ `logo` est de type Image)
+  const logoUrl = clean(payload.logoUrl, 2000);
+  if (logoUrl && !/^wix:image:\/\/v1\//.test(logoUrl)) {
+    console.warn('[LPC][F2] logo refusé (format inattendu) :', logoUrl.slice(0, 40));
+    return { ok: false, reason: 'logo-invalide' };
+  }
+  const supprimerLogo = payload.supprimerLogo === true && !logoUrl;
 
   // Type de lieu : libellé reçu, sinon type par défaut
   let typeIds = await labelsToIds(COL_ORG_TYPES, 'type', payload.organismeType);
@@ -261,6 +271,8 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
       org.localite = localite;
       org.nombre_destinataires = nombre;
       org.commentaire = toRichText(commentaire);
+      if (logoUrl) org.logo = logoUrl;            // nouveau logo -> écrase ; sinon on garde l'existant
+      else if (supprimerLogo) org.logo = '';      // retrait demandé
       delete org.types; delete org.capacites;   // via replaceReferences
       orgId = (await wixData.update(COL_ORGS, org, { suppressAuth: true }))._id;
       console.log('[LPC][F2] organisation mise à jour', orgId);
@@ -274,6 +286,7 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
       pays: 'Belgique',
       ...(nombre == null ? {} : { nombre_destinataires: nombre }),
       commentaire: toRichText(commentaire),
+      ...(logoUrl ? { logo: logoUrl } : {}),
     }, { suppressAuth: true }))._id;
     console.log('[LPC][F2] organisation créée', orgId, linkedOrgId ? `(remplace le lien ${linkedOrgId})` : '');
   }
@@ -340,6 +353,7 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
   const ligne2 = [
     souhaits ? `Souhaits : ${souhaits}` : '',
     nombre != null ? `Personnes concernées : ${nombre}` : '',
+    logoUrl ? 'Logo : ajouté' : '',
   ].filter(Boolean).join(' · ');
   let notify = { ok: false, cause: 'non appelé' };
   try {
