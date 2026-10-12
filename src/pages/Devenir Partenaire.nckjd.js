@@ -20,7 +20,7 @@ const EL = {
   fonction: '#fonction',
   type: '#organismeType',                 // Liste déroulante ou boutons radio (options remplies par le code)
   organisme: '#organisme',
-  localite: '#organismeLocalite',
+  adresse: '#organismeAdresse',           // 12/10 : adresse de l'organisme (champ `adresse`), plus la localité
   capacites: '#capacites',                // Groupe de cases « Comment pourriez-vous aider les Porteurs de chaleur ? » (options remplies par le code)
   commentaire: '#commentaire',
   consentement: '#consentementGdpr',      // Case à cocher unique (RGPD)
@@ -33,7 +33,7 @@ const MESSAGE_OBLIGATOIRE = false;        // passer à true si le message doit �
 const PROPOSITIONS_OBLIGATOIRES = true;   // >= 1 case cochée exigée (passer à false pour rendre facultatif)
 
 $w.onReady(async () => {
-  console.log('[LPC][F3] version du code : 2026-10-12-a (logo de l’organisation)');
+  console.log('[LPC][F3] version du code : 2026-10-12-b (organismeAdresse ; logo de l’organisation)');
   console.log('[LPC][F3] champs obligatoires', { propositions: PROPOSITIONS_OBLIGATOIRES, message: MESSAGE_OBLIGATOIRE });
   // Masquer l'erreur AVANT tout appel réseau (sinon elle reste visible si la suite échoue)
   safe('masquage erreur', hideErr);
@@ -94,7 +94,7 @@ $w.onReady(async () => {
     nomOrigine = d.organisme || '';
     safe('préremplissage organisation', () => {
       setVal(EL.organisme, d.organisme);
-      setVal(EL.localite, d.organismeLocalite);
+      setVal(EL.adresse, d.organismeAdresse);
       setVal(EL.capacites, d.capacites);
       setVal(EL.commentaire, d.commentaire);
     });
@@ -181,7 +181,7 @@ $w.onReady(async () => {
         fonction: valeur(EL.fonction),
         organismeType: valeur(EL.type),
         organisme: valeur(EL.organisme),
-        organismeLocalite: valeur(EL.localite),
+        organismeAdresse: valeur(EL.adresse),
         capacites: valeur(EL.capacites),
         commentaire: valeur(EL.commentaire),
         consentement: coche(EL.consentement),

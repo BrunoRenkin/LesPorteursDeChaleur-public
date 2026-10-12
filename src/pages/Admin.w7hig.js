@@ -27,7 +27,7 @@ import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
 import { adminTotaux, adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 
-const VERSION = '2026-10-12-c';   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-12-d';   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -174,7 +174,7 @@ function texteTotaux(t) {
 }
 const idTotaux = () => IDS_TOTAUX.find((id) => el1(id)) || '#compteur';
 const TOUT_LE_RESTE = ['#ongletMembres', '#ongletOrganismes', '#ongletResidents', '#recherche', '#filtre',
-  '#TotauxMembresetJumelage', '#compteur', '#CompteurCartes', '#enteteTable', '#repeater', '#btnAide', '#btnExport', '#btnEmails', '#zoneExport', '#btnCreerMembre'];
+  '#TotauxMembresetJumelage', '#compteur', '#enteteTable', '#repeater', '#btnAide', '#btnExport', '#btnEmails', '#zoneExport', '#btnCreerMembre'];
 
 function interfaceVisible(oui) {
   if (el('#blocAdmin')) montrer('#blocAdmin', oui);
@@ -443,8 +443,7 @@ async function charger(nouvelOnglet) {
       ? texteTotaux(totauxSite) + (filtree ? ' · affichés : ' + res.lignes.length : '')
       : `${res.lignes.length} ${res.lignes.length > 1 ? plusieurs : un} et ${nbJum} jumelage${nbJum > 1 ? 's' : ''}`);
     // 12/10 : cartes promises (somme des « nombre de cartes » des porteurs de la liste), onglet Membres seulement
-    if (!el('#CompteurCartes')) console.warn('[LPC][Admin] #CompteurCartes introuvable sur la page : à créer dans l’éditeur (texte, ID « CompteurCartes »)');
-    setTxt('#CompteurCartes', onglet === 'membres' ? 'Nombre de cartes : ' + ((res.totaux && res.totaux.cartes) || 0) : '');
+    montrer('#CompteurCartes', false);   // 12/10 : compteur de cartes abandonné (le total des cartes est dans #TotauxMembresetJumelage)
     setTxt('#messageErreur', '');
     return true;
   } catch (e) {

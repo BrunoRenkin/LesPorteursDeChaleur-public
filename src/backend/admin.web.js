@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-12-d';
+const VERSION = '2026-10-12-e';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -189,7 +189,6 @@ async function lignesMembres() {
       cartes: cartes ? `${encours} / ${max || '?'}` : '',
       ...dates(m),
       _jum: encours,
-      _max: cartes ? max : 0,   // 12/10 : cartes promises (somme affichée dans #CompteurCartes de /admin)
       emailNonVerifie,
       filtres: [...statuts, cartes ? 'Écrit des cartes' : '', cartes && encours < max ? 'Non jumelés' : '', emailNonVerifie ? LIB_NON_VERIFIE : ''].filter(Boolean),
     };
@@ -279,15 +278,13 @@ async function lignesFiltrees(params = {}) {
   const gardees = lignes.filter((l) => {
     if (filtre !== TOUS && !l.filtres.some((f) => sansAccents(f) === filtre)) return false;
     if (!q) return true;
-    const meule = sansAccents(Object.entries(l).filter(([k]) => k !== '_id' && k !== '_jum' && k !== 'filtres' && k !== 'cree' && k !== 'modifie' && k !== 'nonValide' && k !== 'emailNonVerifie' && k !== '_max').map(([, v]) => v).join(' '));
+    const meule = sansAccents(Object.entries(l).filter(([k]) => k !== '_id' && k !== '_jum' && k !== 'filtres' && k !== 'cree' && k !== 'modifie' && k !== 'nonValide' && k !== 'emailNonVerifie').map(([, v]) => v).join(' '));
     return q.split(/\s+/).every((mot) => meule.includes(mot));
   });
   gardees.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
   // Totaux de la liste filtrée : nombre de jumelages en cours (affiché « X membres et Y jumelages »)
   const jumelages = gardees.reduce((n, l) => n + (l._jum || 0), 0);
-  // 12/10 : cartes promises = somme des « nombre de cartes » des porteurs de la liste filtrée (onglet Membres)
-  const cartes = gardees.reduce((n, l) => n + (l._max || 0), 0);
-  return { onglet, options, totaux: { jumelages, cartes }, lignes: gardees.map(({ filtres, _jum, _max, ...reste }) => reste) };
+  return { onglet, options, totaux: { jumelages }, lignes: gardees.map(({ filtres, _jum, ...reste }) => reste) };
 }
 
 /** 12/10 : totaux du SITE (membres, cartes promises, résidents actifs, jumelages en cours), affichés dans #TotauxMembresetJumelage des pages admin. */
@@ -948,6 +945,7 @@ export const adminOrganismeCourant = webMethod(Permissions.SiteMember, async () 
     organisation: {
       nom: org.nom || '',
       localite: org.localite || '',
+      adresse: org.adresse || '',   // 12/10 : adresse de l'organisation (champ `adresse`)
       type: typeRetenu,
       tousLesTypes: labelsTypes,
       capacites: libelles(org.capacites, 'capacite'),
@@ -1055,7 +1053,7 @@ function appliquerLogo(fiche, l) {
 }
 
 /**
- * payload = { ticket, nom, type, localite, nombreDestinataires, capacites: string[], commentaire, logoUrl?, supprimerLogo?, consentementLogo? }
+ * payload = { ticket, nom, type, adresse, nombreDestinataires, capacites: string[], commentaire, logoUrl?, supprimerLogo?, consentementLogo? }
  * Mêmes règles que « Mon organisme » : `types` et `capacites` remplacés DANS LE PÉRIMÈTRE des deux genres
  * (Accueillant + Partenaire), le reste conservé.
  * payload.contact = { rang, nom, telephone, fonction } (facultatif) : téléphone et fonction du PREMIER membre rattaché,
@@ -1073,7 +1071,7 @@ export const adminEnregistrerOrganisme = webMethod(Permissions.SiteMember, async
 
   const nom = clean(payload.nom, 200);
   if (!nom) return { ok: false, reason: 'nom-requis' };
-  const localite = clean(payload.localite, 120);
+  const adresse = clean(payload.adresse, 300);   // 12/10 : adresse (la localité existante n'est plus touchée)
   const commentaire = clean(payload.commentaire, 4000);
   const nbRaw = parseInt(String(payload.nombreDestinataires == null ? '' : payload.nombreDestinataires).replace(/\s/g, ''), 10);
   const nombre = Number.isFinite(nbRaw) && nbRaw >= 0 ? nbRaw : null;
@@ -1093,7 +1091,7 @@ export const adminEnregistrerOrganisme = webMethod(Permissions.SiteMember, async
 
   const maj = { ...org };
   maj.nom = nom;
-  maj.localite = localite;
+  maj.adresse = adresse;
   maj.commentaire = toRichText(commentaire);
   if (nombre != null) maj.nombre_destinataires = nombre;
   const logoAvant = org.logo ? 'oui' : 'non';
@@ -1140,7 +1138,7 @@ export const adminEnregistrerOrganisme = webMethod(Permissions.SiteMember, async
 
   // Journal : noms des champs, plus l'ancien nom en cas de renommage (l'organisme n'est pas une personne)
   await journaliser(admin, 'modifier:organismes', org._id,
-    'champs : nom, type, localite, nombre_destinataires, capacites, commentaire · contact : ' + contact
+    'champs : nom, type, adresse, nombre_destinataires, capacites, commentaire · contact : ' + contact
     + (logo.logoUrl || logo.supprimerLogo || accordAvant !== (maj.consentement_logo === true)
       ? ' · logo : ' + (logo.logoUrl ? 'ajouté' : logo.supprimerLogo ? 'retiré' : 'accord modifié') + ' (avant : ' + logoAvant + ', accord ' + accordAvant + ' -> ' + (maj.consentement_logo === true) + ')'
       : '')

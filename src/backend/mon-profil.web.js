@@ -279,6 +279,7 @@ export const getMonProfil = webMethod(Permissions.SiteMember, async () => {
       organisation = {
         nom: org.nom || '',
         localite: org.localite || '',
+        adresse: org.adresse || '',   // 12/10 : adresse de l'organisation (champ `adresse`)
         type: typeRetenu,
         tousLesTypes: labelsTypes,
         capacites: libelles(org.capacites, 'capacite'),
@@ -442,7 +443,7 @@ function appliquerLogo(fiche, l) {
 }
 
 /**
- * payload = { nom, type, localite, nombreDestinataires, capacites: string[], commentaire, logoUrl?, supprimerLogo?, consentementLogo? }
+ * payload = { nom, type, adresse, nombreDestinataires, capacites: string[], commentaire, logoUrl?, supprimerLogo?, consentementLogo? }
  * Met à jour l'organisation DÉJÀ liée. Aucune création : sans organisation, renvoie
  * { ok:false, reason:'pas-d-organisation' } et la page invite à passer par F2 ou F3.
  */
@@ -460,7 +461,7 @@ export const enregistrerMonOrganisation = webMethod(Permissions.SiteMember, asyn
 
   const nom = clean(payload.nom, 200);
   if (!nom) return { ok: false, reason: 'nom-requis' };
-  const localite = clean(payload.localite, 120);
+  const adresse = clean(payload.adresse, 300);   // 12/10 : adresse (la localité existante n'est plus touchée)
   const commentaire = clean(payload.commentaire, 4000);
   const nbRaw = parseInt(String(payload.nombreDestinataires ?? '').replace(/\s/g, ''), 10);
   const nombre = Number.isFinite(nbRaw) && nbRaw >= 0 ? nbRaw : null;
@@ -486,7 +487,7 @@ export const enregistrerMonOrganisation = webMethod(Permissions.SiteMember, asyn
 
   const maj = { ...org };
   maj.nom = nom;
-  maj.localite = localite;
+  maj.adresse = adresse;
   maj.commentaire = toRichText(commentaire);
   if (nombre != null) maj.nombre_destinataires = nombre;
   appliquerLogo(maj, logo);
@@ -503,7 +504,7 @@ export const enregistrerMonOrganisation = webMethod(Permissions.SiteMember, asyn
 });
 
 /**
- * payload = { nom, type, localite, nombreDestinataires, capacites: string[], commentaire }   (06/10, décision de Bruno)
+ * payload = { nom, type, adresse, nombreDestinataires, capacites: string[], commentaire }   (06/10, décision de Bruno)
  * CRÉE l'organisation d'un membre qui n'en a pas (jamais de doublon : refus si une organisation est déjà liée) et la lie
  * (Membres.organisation_id). Le STATUT du membre découle du TYPE choisi : les statuts ajoutés sont ceux du champ Genre de la
  * ligne d'Organisations_Types (« Accueillant », « Partenaire » ou les deux). Ils s'AJOUTENT aux statuts existants (Porteur…).
@@ -517,7 +518,7 @@ export const creerMonOrganisation = webMethod(Permissions.SiteMember, async (pay
 
   const nom = clean(payload.nom, 200);
   if (!nom) return { ok: false, reason: 'nom-requis' };
-  const localite = clean(payload.localite, 120);
+  const adresse = clean(payload.adresse, 300);
   const commentaire = clean(payload.commentaire, 4000);
   const nbRaw = parseInt(String(payload.nombreDestinataires ?? '').replace(/\s/g, ''), 10);
   const nombre = Number.isFinite(nbRaw) && nbRaw >= 0 ? nbRaw : null;
@@ -543,7 +544,7 @@ export const creerMonOrganisation = webMethod(Permissions.SiteMember, async (pay
   const statutIdsAvant = idsOf(row.type);   // lus AVANT tout delete sur la copie
   const orgId = (await wixData.insert(COL_ORGS, {
     nom,
-    localite,
+    adresse,
     pays: 'Belgique',
     ...(nombre == null ? {} : { nombre_destinataires: nombre }),
     commentaire: toRichText(commentaire),
@@ -564,13 +565,13 @@ export const creerMonOrganisation = webMethod(Permissions.SiteMember, async (pay
   let homonyme = false;
   try {
     const cands = (await wixData.query(COL_ORGS).contains('nom', nom).ne('_id', orgId).limit(50).find({ suppressAuth: true })).items;
-    homonyme = cands.some((o) => norm(o.nom) === norm(nom) && norm(o.localite) === norm(localite));
+    homonyme = cands.some((o) => norm(o.nom) === norm(nom) && norm(o.adresse) === norm(adresse));
   } catch (e) { /* signalement facultatif */ }
   try {
     await notifyNewSubmission({
       formName: 'Création d’une organisation (Mon profil)',
-      prenom: row.prenom || '', nom: row.nom || '', email, telephone: row.telephone || '', localite,
-      extra1: 'Organisme : ' + nom + ' (' + typeRow.type + (localite ? ', ' + localite : '') + ') · statut(s) ajouté(s) : ' + statutsAjoutes.map((s) => s.statut).join(', ')
+      prenom: row.prenom || '', nom: row.nom || '', email, telephone: row.telephone || '', localite: adresse,
+      extra1: 'Organisme : ' + nom + ' (' + typeRow.type + (adresse ? ', ' + adresse : '') + ') · statut(s) ajouté(s) : ' + statutsAjoutes.map((s) => s.statut).join(', ')
         + (homonyme ? ' ⚠️ organisation du même nom déjà présente' : ''),
       extra2: nombre != null ? 'Personnes concernées : ' + nombre : '',
       extra3: commentaire ? 'Message : ' + commentaire : '',

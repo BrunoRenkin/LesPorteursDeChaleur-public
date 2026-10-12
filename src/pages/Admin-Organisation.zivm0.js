@@ -59,7 +59,7 @@ const A_REPLIER = ['#email', '#email1', '#Email', '#emailMembre'];   // les ongl
 const CHAMPS = {
   organisme: ['organisme', 'organisme1', 'nomOrganisme'],
   organismeType: ['organismeType', 'organismeType1'],
-  organismeLocalite: ['organismeLocalite', 'organismeLocalite1', 'localiteOrganisme'],
+  organismeAdresse: ['organismeAdresse', 'organismeAdresse1', 'adresseOrganisme'],   // 12/10 : adresse (champ `adresse`), plus la localité
   nombreDestinataires: ['nombreDestinataires', 'nombreDestinataires1'],
   capacites: ['capacitesOrganisme', 'capacitesOrg', 'capacites', 'capacites1'],
   commentaire: ['commentaireOrganisme', 'commentaireOrg', 'commentaire', 'commentaire1'],
@@ -73,7 +73,7 @@ const MOTIFS = {
   commentaire: /commentaire/i,
   organisme: /^organi(sme|sation)\d*$/i,
   organismeType: /type/i,
-  organismeLocalite: /localit|ville/i,
+  organismeAdresse: /^(?!.*mail).*adresse/i,
   nombreDestinataires: /nombre|destinataire/i,
   telephone: /telephone|phone|tel\d*$/i,
   fonction: /fonction|role|poste/i,
@@ -106,7 +106,7 @@ const COLONNES_JUM = [
 ];
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-d (case du logo non grisée)');
+  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-e (organismeAdresse ; case du logo non grisée)');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminOrganisme'));
   safe('masquage erreur', hideErr);
@@ -550,13 +550,13 @@ function remplir() {
   });
   safe('organisme', () => {
     setVal(ID.organisme, o.nom);
-    setVal(ID.organismeLocalite, o.localite);
+    setVal(ID.organismeAdresse, o.adresse);
     setVal(ID.nombreDestinataires, o.nombreDestinataires);
     setVal(ID.capacites, o.capacites);
     setVal(ID.commentaire, o.commentaire);
   });
   safe('remise à zéro des indications de validité', () => {
-    ['organisme', 'organismeType', 'organismeLocalite', 'nombreDestinataires', 'capacites', 'commentaire'].forEach((k) => {
+    ['organisme', 'organismeType', 'organismeAdresse', 'nombreDestinataires', 'capacites', 'commentaire'].forEach((k) => {
       const el = optionnel(ID[k]);
       if (el && typeof el.resetValidityIndication === 'function') {
         try { el.resetValidityIndication(); } catch (e) { /* ignoré */ }
@@ -599,7 +599,7 @@ async function sauver() {
       ticket,
       nom,
       type: typeChoisi(),
-      localite: valeur(ID.organismeLocalite),
+      adresse: valeur(ID.organismeAdresse),
       nombreDestinataires: valeur(ID.nombreDestinataires),
       capacites: valeur(ID.capacites),
       commentaire: valeur(ID.commentaire),
@@ -701,7 +701,7 @@ function clic(id, fn) {
   else console.error('[LPC][AdminOrganisme] bouton ' + id + ' introuvable : le formulaire ne pourra pas être envoyé');
 }
 function checkIds() {
-  const utiles = ['organisme', 'organismeType', 'organismeLocalite', 'nombreDestinataires', 'capacites', 'commentaire', 'enregistrer'];
+  const utiles = ['organisme', 'organismeType', 'organismeAdresse', 'nombreDestinataires', 'capacites', 'commentaire', 'enregistrer'];
   const manquants = utiles.filter((k) => !optionnel(ID[k])).map((k) => `${k}=${ID[k]}`);
   if (manquants.length) {
     console.warn('[LPC][AdminOrganisme] éléments introuvables :', manquants.join(', '));

@@ -7,7 +7,7 @@
 // (backend creerMonOrganisation).
 //
 // Éléments attendus (ID sensibles à la casse), dans #blocOrganisme :
-//   #organisme #organismeLocalite #nombreDestinataires (saisies)  #organismeType (liste)
+//   #organisme #organismeAdresse #nombreDestinataires (saisies)  #organismeType (liste)
 //   #capacitesOrganisme (groupe de cases)  #commentaireOrganisme (zone de texte)
 //   #enregistrerOrganisme (bouton)
 // Commun : #messageErreur (texte)
@@ -31,7 +31,7 @@ const ONGLET_INACTIF = { fond: '#FFFFFF', texte: '#C0392B' };
 const CHAMPS = {
   organisme: ['organisme', 'organisme1', 'nomOrganisme'],
   organismeType: ['organismeType', 'organismeType1'],
-  organismeLocalite: ['organismeLocalite', 'organismeLocalite1', 'localiteOrganisme'],
+  organismeAdresse: ['organismeAdresse', 'organismeAdresse1', 'adresseOrganisme'],   // 12/10 : adresse (champ `adresse`), plus la localité
   nombreDestinataires: ['nombreDestinataires', 'nombreDestinataires1'],
   capacites: ['capacitesOrganisme', 'capacitesOrg', 'capacites', 'capacites1'],
   commentaire: ['commentaireOrganisme', 'commentaireOrg', 'commentaire', 'commentaire1'],
@@ -46,7 +46,7 @@ const MOTIFS = {
   commentaire: /commentaire/i,
   organisme: /^organi(sme|sation)\d*$/i,
   organismeType: /type/i,
-  organismeLocalite: /localit|ville/i,
+  organismeAdresse: /^(?!.*mail).*adresse/i,
   nombreDestinataires: /nombre|destinataire/i,
   telephone: /telephone|phone|tel\d*$/i,
   fonction: /fonction|role|poste/i,
@@ -76,7 +76,7 @@ let ID = {};
 let renommageConfirme = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Organisme] version du code : 2026-10-12-a (logo ; création + modification ; Accueillant -> saisie des résidents ; onglet Profil câblé, onglet Résidents masqué sans organisation)');
+  console.log('[LPC][Organisme] version du code : 2026-10-12-b (organismeAdresse ; logo ; création + modification ; Accueillant -> saisie des résidents ; onglet Profil câblé, onglet Résidents masqué sans organisation)');
   safe('masquage erreur', hideErr);
   safe('résolution des ID', resoudreIds);
   safe('contrôle des ID', checkIds);
@@ -245,7 +245,7 @@ function remplir() {
   if (modeDemande() === 'creation') console.warn('[LPC][Organisme] mode=creation demandé mais une organisation est déjà liée : modification');
   safe('organisme', () => {
     setVal(ID.organisme, o.nom);
-    setVal(ID.organismeLocalite, o.localite);
+    setVal(ID.organismeAdresse, o.adresse);
     setVal(ID.nombreDestinataires, o.nombreDestinataires);
     setVal(ID.capacites, o.capacites);
     setVal(ID.commentaire, o.commentaire);
@@ -256,7 +256,7 @@ function remplir() {
 /** Les champs remplis par le code restent marqués « invalides » par Wix, qui les a vus vides
  *  au rendu serveur. On efface cette indication une fois le préremplissage terminé. */
 function reinitialiserValidite() {
-  ['organisme', 'organismeType', 'organismeLocalite', 'nombreDestinataires',
+  ['organisme', 'organismeType', 'organismeAdresse', 'nombreDestinataires',
     'capacites', 'commentaire', 'telephone', 'fonction'].forEach((k) => {
     const el = optionnel(ID[k]);
     if (el && typeof el.resetValidityIndication === 'function') {
@@ -325,7 +325,7 @@ async function sauver() {
     const charge = {
       nom: nomSaisi,
       type: typeChoisi(),
-      localite: valeur(ID.organismeLocalite),
+      adresse: valeur(ID.organismeAdresse),
       nombreDestinataires: valeur(ID.nombreDestinataires),
       capacites: valeur(ID.capacites),
       commentaire: valeur(ID.commentaire),

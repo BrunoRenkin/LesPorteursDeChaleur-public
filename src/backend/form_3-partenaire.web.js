@@ -181,7 +181,7 @@ export const getMyPartenaireData = webMethod(Permissions.SiteMember, async () =>
           return labels.find((t) => (opts.typeOptions || []).some((o) => norm(o) === norm(t))) || labels[0] || '';
         })(),
         organismeTypes: (org.types || []).map((r) => r && r.type).filter(Boolean),   // diagnostic
-        organismeLocalite: org.localite || '',
+        organismeAdresse: org.adresse || '',   // 12/10 : le formulaire poste dans `adresse` (la localité existante n'est plus touchée)
         capacites: (org.capacites || []).map((r) => r && r.capacite).filter(Boolean),
         commentaire: fromRichText(org.commentaire),
         logoUrl: typeof org.logo === 'string' ? org.logo : '',   // 12/10 : logo de l'organisation
@@ -194,7 +194,7 @@ export const getMyPartenaireData = webMethod(Permissions.SiteMember, async () =>
 
 /**
  * payload = { prenom, nom, telephone, fonction,
- *             organismeType: string, organisme: string, organismeLocalite: string,
+ *             organismeType: string, organisme: string, organismeAdresse: string,
  *             capacites: string[], commentaire: string, consentement: boolean,
  *             logoUrl?: string, supprimerLogo?: boolean, consentementLogo?: boolean }   (12/10 : logo, voir F2)
  */
@@ -210,7 +210,7 @@ export const submitPartenaire = webMethod(Permissions.SiteMember, async (payload
   const telephone = clean(payload.telephone, 40);
   const fonction = clean(payload.fonction, 120);
   const organisme = clean(payload.organisme, 200);
-  const localite = clean(payload.organismeLocalite, 120);
+  const adresse = clean(payload.organismeAdresse, 300);
   const commentaire = clean(payload.commentaire, 4000);
   if (!organisme) return { ok: false, reason: 'organisme-requis' };
   // Logo (12/10) : image Wix Media seulement ; un nouveau logo exige l'autorisation (comme F2)
@@ -249,7 +249,7 @@ export const submitPartenaire = webMethod(Permissions.SiteMember, async (payload
       typesAvant = idsOf(org.types);
       capsAvant = idsOf(org.capacites);
       org.nom = organisme;
-      org.localite = localite;
+      org.adresse = adresse;
       org.commentaire = toRichText(commentaire);
       if (logoUrl) { org.logo = logoUrl; org.consentement_logo = true; }
       else if (supprimerLogo) { org.logo = ''; org.consentement_logo = false; }
@@ -263,7 +263,7 @@ export const submitPartenaire = webMethod(Permissions.SiteMember, async (payload
   if (orgCreee) {
     orgId = (await wixData.insert(COL_ORGS, {
       nom: organisme,
-      localite,
+      adresse,
       pays: 'Belgique',
       commentaire: toRichText(commentaire),
       ...(logoUrl ? { logo: logoUrl, consentement_logo: true } : {}),
@@ -280,7 +280,7 @@ export const submitPartenaire = webMethod(Permissions.SiteMember, async (payload
   try {
     const cands = (await wixData.query(COL_ORGS).contains('nom', organisme).ne('_id', orgId)
       .limit(50).find({ suppressAuth: true })).items;
-    homonyme = cands.some((o) => norm(o.nom) === norm(organisme) && norm(o.localite) === norm(localite));
+    homonyme = cands.some((o) => norm(o.nom) === norm(organisme) && norm(o.adresse) === norm(adresse));
   } catch (e) {
     console.warn('[LPC][F3] recherche homonyme KO:', e && e.message);
   }
@@ -335,8 +335,8 @@ export const submitPartenaire = webMethod(Permissions.SiteMember, async (payload
       formName: dejaPartenaire && !orgCreee
         ? 'Devenir partenaire (mise à jour)'
         : 'Devenir partenaire',
-      prenom, nom, email, telephone, localite,
-      extra1: `Organisme : ${organisme} (${typeLabel}${localite ? ', ' + localite : ''})`
+      prenom, nom, email, telephone, localite: adresse,
+      extra1: `Organisme : ${organisme} (${typeLabel}${adresse ? ', ' + adresse : ''})`
         + (homonyme ? ' ⚠️ organisation du même nom déjà présente' : ''),
       extra2: [propositions ? `Propositions : ${propositions}` : '', logoUrl ? 'Logo : ajouté' : ''].filter(Boolean).join(' · '),
       extra3: commentaire ? `Message : ${commentaire}` : '',

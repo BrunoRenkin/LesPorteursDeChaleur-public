@@ -187,7 +187,7 @@ export const getMyAccueillantData = webMethod(Permissions.SiteMember, async () =
           return labels.find((t) => (opts.typeOptions || []).some((o) => norm(o) === norm(t))) || labels[0] || '';
         })(),
         organismeTypes: (org.types || []).map((r) => r && r.type).filter(Boolean),   // diagnostic
-        organismeLocalite: org.localite || '',
+        organismeAdresse: org.adresse || '',   // 12/10 : le formulaire poste dans `adresse` (la localité existante n'est plus touchée)
         nombreDestinataires: org.nombre_destinataires == null ? '' : String(org.nombre_destinataires),
         capacites: (org.capacites || []).map((r) => r && r.capacite).filter(Boolean),
         commentaire: fromRichText(org.commentaire),
@@ -207,7 +207,7 @@ export const getMyAccueillantData = webMethod(Permissions.SiteMember, async () =
 
 /**
  * payload = { prenom, nom, telephone, fonction,
- *             organismeType: string, organisme: string, organismeLocalite: string,
+ *             organismeType: string, organisme: string, organismeAdresse: string,
  *             nombreDestinataires: string|number, capacites: string[], commentaire: string,
  *             consentement: boolean,
  *             logoUrl?: string,         // 12/10 : URI Wix Media (wix:image://…) du logo téléversé par la page (uploadFiles)
@@ -226,7 +226,7 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
   const telephone = clean(payload.telephone, 40);
   const fonction = clean(payload.fonction, 120);
   const organisme = clean(payload.organisme, 200);
-  const localite = clean(payload.organismeLocalite, 120);
+  const adresse = clean(payload.organismeAdresse, 300);
   const commentaire = clean(payload.commentaire, 4000);
   const nbRaw = parseInt(String(payload.nombreDestinataires ?? '').replace(/\s/g, ''), 10);
   const nombre = Number.isFinite(nbRaw) && nbRaw >= 0 ? nbRaw : null;
@@ -272,7 +272,7 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
       typesAvant = idsOf(org.types);
       capsAvant = idsOf(org.capacites);
       org.nom = organisme;
-      org.localite = localite;
+      org.adresse = adresse;
       org.nombre_destinataires = nombre;
       org.commentaire = toRichText(commentaire);
       if (logoUrl) { org.logo = logoUrl; org.consentement_logo = true; }   // nouveau logo -> écrase ; sinon on garde l'existant
@@ -287,7 +287,7 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
   if (orgCreee) {
     orgId = (await wixData.insert(COL_ORGS, {
       nom: organisme,
-      localite,
+      adresse,
       pays: 'Belgique',
       ...(nombre == null ? {} : { nombre_destinataires: nombre }),
       commentaire: toRichText(commentaire),
@@ -305,7 +305,7 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
   try {
     const cands = (await wixData.query(COL_ORGS).contains('nom', organisme).ne('_id', orgId)
       .limit(50).find({ suppressAuth: true })).items;
-    homonyme = cands.some((o) => norm(o.nom) === norm(organisme) && norm(o.localite) === norm(localite));
+    homonyme = cands.some((o) => norm(o.nom) === norm(organisme) && norm(o.adresse) === norm(adresse));
   } catch (e) {
     console.warn('[LPC][F2] recherche homonyme KO:', e && e.message);
   }
@@ -366,8 +366,8 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
       formName: dejaAccueillant && !orgCreee
         ? 'Accueillir des Porteurs de chaleur (mise à jour)'
         : 'Accueillir des Porteurs de chaleur',
-      prenom, nom, email, telephone, localite,
-      extra1: `Organisme : ${organisme} (${typeLabel}${localite ? ', ' + localite : ''})`
+      prenom, nom, email, telephone, localite: adresse,
+      extra1: `Organisme : ${organisme} (${typeLabel}${adresse ? ', ' + adresse : ''})`
         + (homonyme ? ' ⚠️ organisation du même nom déjà présente' : ''),
       extra2: ligne2,
       extra3: commentaire ? `Message : ${commentaire}` : '',

@@ -20,7 +20,7 @@ const EL = {
   fonction: '#fonction',
   type: '#organismeType',                 // Liste déroulante ou boutons radio (options remplies par le code)
   organisme: '#organisme',
-  localite: '#organismeLocalite',
+  adresse: '#organismeAdresse',           // 12/10 : adresse de l'organisme (champ `adresse`), plus la localité
   nombre: '#nombreDestinataires',
   capacites: '#capacites',                // Groupe de cases « Qu’aimeriez-vous imaginer avec les Porteurs de chaleur ? » (options remplies par le code)
   commentaire: '#commentaire',
@@ -41,7 +41,7 @@ const PAGE_MERCI = '/accueillir-les-porteurs-mes-residents';
 const SOUHAITS_OBLIGATOIRES = true;   // >= 1 case cochee exigee
 
 $w.onReady(async () => {
-  console.log('[LPC][F2] version du code : 2026-10-12-b (logo de l’organisation + consentement)');
+  console.log('[LPC][F2] version du code : 2026-10-12-c (organismeAdresse ; logo de l’organisation + consentement)');
   console.log('[LPC][F2] champs obligatoires', { souhaits: SOUHAITS_OBLIGATOIRES });
   // Masquer l'erreur AVANT tout appel réseau (sinon elle reste visible si la suite échoue)
   safe('masquage erreur', hideErr);
@@ -101,7 +101,7 @@ $w.onReady(async () => {
     nomOrigine = d.organisme || '';
     safe('préremplissage organisation', () => {
       setVal(EL.organisme, d.organisme);
-      setVal(EL.localite, d.organismeLocalite);
+      setVal(EL.adresse, d.organismeAdresse);
       setVal(EL.nombre, d.nombreDestinataires);
       setVal(EL.capacites, d.capacites);
       setVal(EL.commentaire, d.commentaire);
@@ -213,7 +213,7 @@ $w.onReady(async () => {
         fonction: valeur(EL.fonction),
         organismeType: valeur(EL.type),
         organisme: valeur(EL.organisme),
-        organismeLocalite: valeur(EL.localite),
+        organismeAdresse: valeur(EL.adresse),
         nombreDestinataires: nb,
         capacites: valeur(EL.capacites),
         commentaire: valeur(EL.commentaire),
