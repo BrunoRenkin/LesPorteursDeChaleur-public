@@ -25,7 +25,7 @@ const updateMember = elevate(members.updateMember);   // « Manage Members »
  *   Seul changement : `nbResidentsMax` est désormais MODIFIABLE ici comme dans F1 (voir enregistrerMonProfil).
  */
 
-const VERSION = '2026-10-08-f';
+const VERSION = '2026-10-12-a';
 const SITE_ID = 'REDACTED-WIX-SITE-ID';
 
 const COL_MEMBRES = 'Membres';
