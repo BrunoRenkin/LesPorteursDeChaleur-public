@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-12-b';
+const VERSION = '2026-10-12-c';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -289,6 +289,17 @@ async function lignesFiltrees(params = {}) {
   const cartes = gardees.reduce((n, l) => n + (l._max || 0), 0);
   return { onglet, options, totaux: { jumelages, cartes }, lignes: gardees.map(({ filtres, _jum, _max, ...reste }) => reste) };
 }
+
+/** 12/10 : totaux du SITE (membres, cartes promises, résidents actifs, jumelages en cours), affichés dans #TotauxMembresetJumelage des pages admin. */
+export const adminTotaux = webMethod(Permissions.SiteMember, async () => {
+  try { await exigerAdmin('totaux'); } catch (e) { if (estRefus(e)) return REFUSE; throw e; }
+  const [membres, residents, j] = await Promise.all([tout('Membres', 'capacites'), tout('Residents'), jumelagesEnCours()]);
+  const actifs = new Set(residents.filter((r) => r.actif !== false).map((r) => r._id));
+  const cartes = membres.reduce((n, m) => n + (ecrit(m.capacites) ? (Number(m.nbResidentsMax) || 0) : 0), 0);
+  let jumelages = 0;
+  j.parResident.forEach((n, id) => { if (actifs.has(id)) jumelages += n; });
+  return { ok: true, membres: membres.length, cartes, residents: actifs.size, jumelages };
+});
 
 /** Vrai/faux pour l'affichage du lien « Admin » : aucune donnée, aucun journal. */
 export const estAdmin = webMethod(Permissions.SiteMember, async () => estAdminSilencieux());

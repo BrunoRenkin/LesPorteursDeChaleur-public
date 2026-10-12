@@ -1,5 +1,5 @@
 // Code de PAGE « Back-office » (/admin) — listes filtrables Membres / Organismes / Résidents + export.
-// version du code : 2026-10-12-b   (12/10 b : garde sur les cellules absentes du modèle ; 12/10 a : #CompteurCartes « nombre de cartes : N » sur l'onglet Membres ; 10/10 b : bouton « Créer un membre » visible sur les trois onglets)
+// version du code : 2026-10-12-c   (12/10 c : totaux du site dans #TotauxMembresetJumelage ; 12/10 b : garde sur les cellules absentes du modèle ; 12/10 a : #CompteurCartes « nombre de cartes : N » sur l'onglet Membres ; 10/10 b : bouton « Créer un membre » visible sur les trois onglets)
 //   (anciennement 2026-10-10-a   (10/10 a : onglet Membres : fiche dont l'e-mail Wix n'est pas vérifié = 2e bouton facultatif #btnEnvoyerLien « Envoyer le lien » à côté de « Modifier »)
 //   (anciennement 2026-10-07-c   (07/10 c : « Non validé » + bouton « Valider » ; 07/10 : troncature à 60 caractères des textes libres ; bouton #btnCreerMembre ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes »)
 //
@@ -25,9 +25,9 @@
 import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
-import { adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
+import { adminTotaux, adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 
-const VERSION = '2026-10-12-b';   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-12-c';   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -165,6 +165,13 @@ function peindre(e, c) {
 
 // Texte des totaux « X membres et Y jumelages » : #TotauxMembresetJumelage (ex-box155), à défaut #compteur
 const IDS_TOTAUX = ['#TotauxMembresetJumelage', '#compteur'];
+let totauxSite = null;   // 12/10 : totaux du site (adminTotaux), lus une fois par chargement de la page
+/** « 90 membres, 90 cartes, 9 résidents et 6 jumelages » (totaux du site, adminTotaux) ; séparateur de milliers : point. */
+function texteTotaux(t) {
+  const f = (n) => String(Number(n) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const p = (n, u, m) => f(n) + ' ' + ((Number(n) || 0) > 1 ? m : u);
+  return p(t.membres, 'membre', 'membres') + ', ' + p(t.cartes, 'carte', 'cartes') + ', ' + p(t.residents, 'résident', 'résidents') + ' et ' + p(t.jumelages, 'jumelage', 'jumelages');
+}
 const idTotaux = () => IDS_TOTAUX.find((id) => el1(id)) || '#compteur';
 const TOUT_LE_RESTE = ['#ongletMembres', '#ongletOrganismes', '#ongletResidents', '#recherche', '#filtre',
   '#TotauxMembresetJumelage', '#compteur', '#CompteurCartes', '#enteteTable', '#repeater', '#btnAide', '#btnExport', '#btnEmails', '#zoneExport', '#btnCreerMembre'];
@@ -425,10 +432,19 @@ async function charger(nouvelOnglet) {
     afficher();
     const [un, plusieurs] = NOMS[onglet];
     const nbJum = (res.totaux && res.totaux.jumelages) || 0;
-    setTxt(idTotaux(), `${res.lignes.length} ${res.lignes.length > 1 ? plusieurs : un} et ${nbJum} jumelage${nbJum > 1 ? 's' : ''}`);
+    if (!totauxSite) {
+      try { const t = await adminTotaux(); if (t && t.ok) totauxSite = t; } catch (e) { console.warn('[LPC][Admin] adminTotaux KO :', e && e.message); }
+      if (n !== appel) return true;
+    }
+    const fc = filtreCourant();
+    const filtree = Boolean(fc.recherche || fc.filtre);
+    // 12/10 : totaux du SITE dans tous les onglets ; liste filtrée : nombre de lignes affichées ajouté
+    setTxt(idTotaux(), totauxSite
+      ? texteTotaux(totauxSite) + (filtree ? ' · affichés : ' + res.lignes.length : '')
+      : `${res.lignes.length} ${res.lignes.length > 1 ? plusieurs : un} et ${nbJum} jumelage${nbJum > 1 ? 's' : ''}`);
     // 12/10 : cartes promises (somme des « nombre de cartes » des porteurs de la liste), onglet Membres seulement
     if (!el('#CompteurCartes')) console.warn('[LPC][Admin] #CompteurCartes introuvable sur la page : à créer dans l’éditeur (texte, ID « CompteurCartes »)');
-    setTxt('#CompteurCartes', onglet === 'membres' ? 'nombre de cartes : ' + ((res.totaux && res.totaux.cartes) || 0) : '');
+    setTxt('#CompteurCartes', onglet === 'membres' ? 'Nombre de cartes : ' + ((res.totaux && res.totaux.cartes) || 0) : '');
     setTxt('#messageErreur', '');
     return true;
   } catch (e) {

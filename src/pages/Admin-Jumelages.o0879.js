@@ -1,5 +1,5 @@
 // Code de PAGE « Adminjumelage » (/adminjumelages) : jumelage MANUEL porteur <-> résident, par un administrateur.
-// version du code : 2026-10-12-a   (12/10 : bouton Jumelage de la navigation fonctionne depuis la liste d'un porteur ; 07/10 : « Centres d'intérêt » et « Infos importantes » tronqués à 60 caractères à l'affichage ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes » ; ordre Centres d'intérêt, Infos importantes ;
+// version du code : 2026-10-12-b   (12/10 b : totaux du site dans #TotauxMembresetJumelage (mode tous) ; 12/10 : bouton Jumelage de la navigation fonctionne depuis la liste d'un porteur ; 07/10 : « Centres d'intérêt » et « Infos importantes » tronqués à 60 caractères à l'affichage ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes » ; ordre Centres d'intérêt, Infos importantes ;
 //   #c8 masqué ; Résident -> lien vers /adminresidents, Institution -> lien vers /adminorganisme)
 //
 // Page « Membres uniquement » : le contrôle réel est dans le backend (backend/admin.web.js -> backend/lpc-acces.js). Aucune
@@ -21,13 +21,13 @@
 
 import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
-import { adminJumelageDonnees, adminJumeler, adminAnnulerJumelage, adminOuvrirResidents, adminEmailPorteur, adminOuvrirOrganismeDuResident, adminOuvrirResidentsDuResident } from 'backend/admin.web';
+import { adminTotaux, adminJumelageDonnees, adminJumeler, adminAnnulerJumelage, adminOuvrirResidents, adminEmailPorteur, adminOuvrirOrganismeDuResident, adminOuvrirResidentsDuResident } from 'backend/admin.web';
 import wixWindowFrontend from 'wix-window-frontend';
 
 const TEXTE_LIBRE = ['interets', 'infosimportantes'];   // 07/10 : cellules de texte libre tronquées à l'affichage (2 lignes maximum)
 const LONGUEUR_MAX_CELLULE = 60;
 const coupe = (id, t) => (TEXTE_LIBRE.includes(id) && t.length > LONGUEUR_MAX_CELLULE ? t.slice(0, LONGUEUR_MAX_CELLULE - 1).trimEnd() + '…' : t);
-const VERSION = '2026-10-12-a';   // 12/10 : bouton « Jumelage » depuis une liste de porteur ou d'organisme = même page, tous les résidents (en place) ;   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
+const VERSION = '2026-10-12-b';   // 12/10 (b) : totaux du site en mode « tous les résidents » ;   // 12/10 : bouton « Jumelage » depuis une liste de porteur ou d'organisme = même page, tous les résidents (en place) ;   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
 const NB_CELLULES = 10;
 const COULEUR_ERREUR = '#C0392B';
 const CLASSE_TEXTE = 'font_8';
@@ -162,6 +162,7 @@ function appliquer(res) {
   safe('filtre', peindreFiltre);
   safe('lignes', afficher);
   safe('compteur', peindreCompteur);
+  if (tous) safe('totaux du site', peindreTotauxSite);   // 12/10 : « xx membres, yy cartes, zz résidents et ww jumelages »
 }
 
 function peindreTitre() {
@@ -559,6 +560,26 @@ function hideErr() {
 }
 
 // ─── utilitaires tolérants aux ID manquants ──────────────────────────────
+/** « 90 membres, 90 cartes, 9 résidents et 6 jumelages » (totaux du site, adminTotaux) ; séparateur de milliers : point. */
+function texteTotaux(t) {
+  const f = (n) => String(Number(n) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const p = (n, u, m) => f(n) + ' ' + ((Number(n) || 0) > 1 ? m : u);
+  return p(t.membres, 'membre', 'membres') + ', ' + p(t.cartes, 'carte', 'cartes') + ', ' + p(t.residents, 'résident', 'résidents') + ' et ' + p(t.jumelages, 'jumelage', 'jumelages');
+}
+let totauxSite = null;
+const IDS_TOTAUX_SITE = ['#TotauxMembresetJumelage', '#TotauxAdmin', '#TotauxMembresetJumelageAdmin'];
+/** Écrit les totaux du site dans #TotauxMembresetJumelage (12/10) ; élément absent : avertissement, rien d'autre. */
+async function peindreTotauxSite() {
+  const e = premier(IDS_TOTAUX_SITE);
+  if (!e) { console.warn('[LPC][AdminJumelage] #TotauxMembresetJumelage introuvable : totaux du site non affichés (à créer dans l’éditeur)'); return; }
+  if (!totauxSite) {
+    try { const t = await adminTotaux(); if (t && t.ok) totauxSite = t; }
+    catch (x) { console.warn('[LPC][AdminJumelage] adminTotaux KO :', x && x.message); }
+  }
+  if (!totauxSite) return;
+  try { e.text = texteTotaux(totauxSite); montrer(e); if (typeof montrerParents === 'function') montrerParents(e); } catch (x) { console.warn('[LPC][AdminJumelage] totaux KO :', x && x.message); }
+}
+
 function safe(label, fn) {
   try { return fn(); } catch (e) { console.error('[LPC][AdminJumelage] ' + label + ' KO:', e); }
 }

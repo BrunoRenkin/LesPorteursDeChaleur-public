@@ -21,9 +21,10 @@
 
 import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
+import wixWindowFrontend from 'wix-window-frontend';
 import { getMesResidents, enregistrerMesResidents } from 'backend/residents.web';
 
-const VERSION = '2026-10-12-a';   // 06/10 (c) : #btnAjouter devient « Supprimer » sur les résidents déjà encodés non jumelés ; #NomPorteur si jumelé
+const VERSION = '2026-10-12-b';   // 12/10 (b) : popup au clic sur #Tooltip ;   // 06/10 (c) : #btnAjouter devient « Supprimer » sur les résidents déjà encodés non jumelés ; #NomPorteur si jumelé
 
 // ↓↓↓ SEULE LIGNE DIFFÉRENTE ENTRE LES DEUX PAGES ↓↓↓
 const PARCOURS = 'creation';   // 'mon-profil' (/mes-residents) | 'creation' (/accueillir-les-porteurs-mes-residents)
@@ -212,10 +213,34 @@ function remplirLigne($item, r) {
       if (!pose) { try { if ('html' in tt) { tt.html = '<p>' + TEXTE_TOOLTIP + '</p>'; pose = true; } } catch (e) { /* ignoré */ } }
       if (!pose) console.warn('[LPC][Residents] #Tooltip : aucune propriété de texte reconnue (type ' + tt.type + ') : écrire le texte dans l’éditeur');
       montrer(tt);
+      // Popup au clic (12/10) : lightbox « ResidentJumele » (à créer dans l'éditeur), à défaut message dans la page avec le lien de contact
+      try {
+        if (typeof tt.onClick === 'function') tt.onClick(() => {
+          const t = Date.now();
+          if (t - dernierClic < 600) return;
+          dernierClic = t;
+          infoJumele();
+        });
+      } catch (e) { /* ignoré */ }
     } else cacher(tt);
   }
   const absents = ['prenom', 'initiale', 'chambre', 'infos', 'interets', 'ajouter', 'nomPorteur'].concat(jumele ? ['tooltip'] : []).filter((k) => !el(k));
   if (absents.length) console.warn('[LPC][Residents] ligne du répéteur : ID introuvables :', absents.join(', '));
+}
+
+const NOM_LIGHTBOX_JUMELE = 'ResidentJumele';
+const HTML_JUMELE = '<p style="margin:0;">Ce résident est attribué à un Porteur de chaleur, il ne peut être supprimé. En cas de besoin, n’hésitez pas à <a href="https://www.lesporteursdechaleur.com/contact" target="_self">nous contacter</a>.</p>';
+/** Popup d'un résident jumelé non supprimable. Repli sans lightbox : le même texte, avec son lien, dans l'élément de message de la page. */
+async function infoJumele() {
+  try { await wixWindowFrontend.openLightbox(NOM_LIGHTBOX_JUMELE); return; }
+  catch (e) { console.warn('[LPC][Residents] lightbox « ' + NOM_LIGHTBOX_JUMELE + ' » indisponible, repli sur le message de la page :', e && e.message); }
+  const m = messageEl();
+  if (!m) return;
+  try {
+    if (m.html !== undefined) m.html = HTML_JUMELE;
+    else if (m.text !== undefined) m.text = 'Ce résident est attribué à un Porteur de chaleur, il ne peut être supprimé. En cas de besoin, n’hésitez pas à nous contacter.';
+    montrer(m);
+  } catch (e) { /* ignoré */ }
 }
 
 /** Relit toutes les lignes (les données du répéteur ne suivent pas la frappe). */

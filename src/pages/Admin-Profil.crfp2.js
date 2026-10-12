@@ -1,6 +1,6 @@
 // Code de PAGE « Adminprofil » (/adminprofil) : un administrateur modifie la fiche d'un MEMBRE.
 // Mode « admin » du formulaire générique : la page contient la SECTION GLOBALE de F1 (mêmes ID).
-// version du code : 2026-10-10-d   (10/10 d : message de refus de création : e-mail ou téléphone déjà utilisé)
+// version du code : 2026-10-12-a   (12/10 a : totaux du site dans #TotauxMembresetJumelage en mode création ; 10/10 d : message de refus de création : e-mail ou téléphone déjà utilisé)
 //   (anciennement 2026-10-10-c   (10/10 c : création : le détail de l'erreur Wix est écrit en console)
 //   (anciennement 2026-10-10-b   (10/10 b : le lien vers /adminjumelages n'est plus sur le titre #AdmintitreJumelages mais sur #LienJumelages (visible seulement si le porteur peut jumeler))
 //   (anciennement 2026-10-10-a   (10/10 a : mode création : photo (ajout, vignette, retrait, consentement image) comme en modification, envoyée à la création ; capacités rouvertes explicitement ; tableau des jumelages : colonnes Nom / Centres d'intérêt / Établissement, police et graisse harmonisées (classe lpc-table-jumelage))
@@ -35,7 +35,7 @@
 import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
-import { adminCreationOptions, adminCreerMembre, adminFicheCourante, adminEnregistrerMembre, adminOuvrirOrganismeDuMembre, adminOuvrirMembreRattache, adminOuvrirResidents, adminEmailPorteurCourant, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
+import { adminTotaux, adminCreationOptions, adminCreerMembre, adminFicheCourante, adminEnregistrerMembre, adminOuvrirOrganismeDuMembre, adminOuvrirMembreRattache, adminOuvrirResidents, adminEmailPorteurCourant, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 import { tracerClient } from 'backend/trace-client.web';
 
 // ID de la section globale (identiques à F1 et /mon-profil). Sensibles à la casse.
@@ -131,7 +131,7 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminProfil] version du code : 2026-10-10-d', CREATION ? '(mode création)' : '');
+  console.log('[LPC][AdminProfil] version du code : 2026-10-12-a', CREATION ? '(mode création)' : '');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminProfil'));
   safe('masquage erreur', hideErr);
@@ -157,7 +157,7 @@ $w.onReady(async () => {
 
   if (!authentication.loggedIn()) { wixLocation.to('/participer'); return; }
   desactiverBouton();   // réactivé une fois la fiche chargée
-  if (CREATION) { await initCreation(); return; }
+  if (CREATION) { safe('totaux du site', peindreTotauxSite); await initCreation(); return; }
 
   // Arrivée par un lien de membre de #TitreLinkAdmin de /adminorganisme (?rang=N, quand l'organisme a PLUSIEURS membres) : le
   // serveur ouvre ce membre rattaché à l'organisme en cours, puis la page se charge normalement. Sans ce paramètre
@@ -1025,6 +1025,26 @@ function masquerErr(e) {
 }
 
 // ─── utilitaires tolérants aux ID manquants ──────────────────────────────
+/** « 90 membres, 90 cartes, 9 résidents et 6 jumelages » (totaux du site, adminTotaux) ; séparateur de milliers : point. */
+function texteTotaux(t) {
+  const f = (n) => String(Number(n) || 0).replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  const p = (n, u, m) => f(n) + ' ' + ((Number(n) || 0) > 1 ? m : u);
+  return p(t.membres, 'membre', 'membres') + ', ' + p(t.cartes, 'carte', 'cartes') + ', ' + p(t.residents, 'résident', 'résidents') + ' et ' + p(t.jumelages, 'jumelage', 'jumelages');
+}
+let totauxSite = null;
+const IDS_TOTAUX_SITE = ['#TotauxMembresetJumelage', '#TotauxAdmin', '#TotauxMembresetJumelageAdmin'];
+/** Écrit les totaux du site dans #TotauxMembresetJumelage (12/10) ; élément absent : avertissement, rien d'autre. */
+async function peindreTotauxSite() {
+  const e = premier(IDS_TOTAUX_SITE);
+  if (!e) { console.warn('[LPC][AdminProfil] #TotauxMembresetJumelage introuvable : totaux du site non affichés (à créer dans l’éditeur)'); return; }
+  if (!totauxSite) {
+    try { const t = await adminTotaux(); if (t && t.ok) totauxSite = t; }
+    catch (x) { console.warn('[LPC][AdminProfil] adminTotaux KO :', x && x.message); }
+  }
+  if (!totauxSite) return;
+  try { e.text = texteTotaux(totauxSite); montrer(e); if (typeof montrerParents === 'function') montrerParents(e); } catch (x) { console.warn('[LPC][AdminProfil] totaux KO :', x && x.message); }
+}
+
 function safe(label, fn) {
   try { fn(); } catch (e) { console.error('[LPC][AdminProfil] ' + label + ' KO:', e); }
 }

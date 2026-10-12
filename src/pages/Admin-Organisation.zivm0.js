@@ -106,7 +106,7 @@ const COLONNES_JUM = [
 ];
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-a');
+  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-b');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminOrganisme'));
   safe('masquage erreur', hideErr);
@@ -444,10 +444,22 @@ function afficherJumelagesOrganisme() {
   if (!tab) { if (liste.length) console.warn('[LPC][AdminOrganisme] #OrgtableJumelage introuvable : jumelages non affichés'); return; }
   if (!liste.length) { cacher(tab); return; }
   try {
-    try { tab.columns = COLONNES_JUM.map((c) => Object.assign({}, c)); }
-    catch (e) { console.warn('[LPC][AdminOrganisme] colonnes de #OrgtableJumelage non posées (' + (e && e.message) + ')'); }
+    // Colonnes fusionnées avec celles de l'éditeur (comme #tableJumelage de /adminprofil) ; les dataPath réellement retenus servent aux lignes
+    let dp = COLONNES_JUM.map((c) => c.dataPath);
+    try {
+      const actuelles = Array.isArray(tab.columns) ? tab.columns : [];
+      console.log('[LPC][AdminOrganisme] colonnes de l’éditeur :', JSON.stringify(actuelles.map((c) => c && { dataPath: c.dataPath, label: c.label, width: c.width })));
+      tab.columns = COLONNES_JUM.map((c, i) => Object.assign({}, actuelles[i] || {}, c));
+      const apres = Array.isArray(tab.columns) ? tab.columns : [];
+      if (apres.length >= 3) dp = apres.slice(0, 3).map((c, i) => (c && c.dataPath) || dp[i]);
+    } catch (e) { console.warn('[LPC][AdminOrganisme] colonnes de #OrgtableJumelage non posées (' + (e && e.message) + ')'); }
     try { if (tab.customClassList) tab.customClassList.add('lpc-table-jumelage'); } catch (e) { /* classe sans effet : style du tableau dans l'éditeur */ }
-    tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), resident: x.resident || '', chambre: x.chambre || '', porteur: x.porteur || '' }));
+    tab.rows = liste.map((x, i) => {
+      const o = { _id: 'j' + (i + 1) };
+      [x.resident || '', x.chambre || '', x.porteur || ''].forEach((v, k) => { o[dp[k]] = v; });
+      return o;
+    });
+    console.log('[LPC][AdminOrganisme] #OrgtableJumelage : lignes posées', liste.length, '| dataPath', dp.join(', '));
     montrer(tab); montrerParents(tab);
   } catch (e) { console.error('[LPC][AdminOrganisme] tableau des jumelages KO :', e); }
 }
