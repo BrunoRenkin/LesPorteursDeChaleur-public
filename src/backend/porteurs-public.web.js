@@ -6,6 +6,8 @@ import wixData from 'wix-data';
  *  version du code : 2026-10-02-b  (-b : contrôle strict de la photo en JS, isNotEmpty() laissait passer un membre sans photo)
  *    getPorteursMosaique()   photos + prénoms des membres Porteur ayant une photo ET le consentement image,
  *                            dans un ORDRE ALÉATOIRE à chaque appel
+ *    getCompteursPublics()   (12/10) TROIS ENTIERS pour les compteurs de la page d'accueil : porteurs, institutions, résidents
+ *                            (aucune donnée personnelle, aucun identifiant)
  *
  *  SÉCURITÉ / RGPD (Bruno, 02/10 : prénom seul)
  *   - Appelable par tout visiteur (Permissions.Anyone) : la méthode ne renvoie QUE { photo, prenom }.
@@ -15,7 +17,7 @@ import wixData from 'wix-data';
  *   - suppressAuth : `Membres` est en Admin only.
  */
 
-const VERSION = '2026-10-02-b';
+const VERSION = '2026-10-12-a';
 const STATUT = 'porteur';
 const LIMITE = 1000;
 
@@ -62,5 +64,31 @@ export const getPorteursMosaique = webMethod(Permissions.Anyone, async () => {
   } catch (e) {
     console.error('[LPC][porteurs-public] erreur :', e && e.message);
     return { ok: false, items: [] };
+  }
+});
+
+/**
+ * Compteurs de la page d'accueil (Bruno, 12/10 : chiffres RÉELS du CMS). Définitions décidées par Bruno :
+ *   porteurs     = membres ayant le statut Porteur (fiches actives)
+ *   institutions = organisations (lieux d'accueil ET partenaires)
+ *   residents    = résidents ACTIFS seulement
+ * Ne renvoie que trois entiers : ni noms, ni identifiants, ni détail par organisation.
+ */
+export const getCompteursPublics = webMethod(Permissions.Anyone, async () => {
+  try {
+    const [membres, organisations, residents] = await Promise.all([
+      wixData.query('Membres').include('type').limit(LIMITE).find({ suppressAuth: true }),
+      wixData.query('Organisations').limit(LIMITE).find({ suppressAuth: true }),
+      wixData.query('Residents').limit(LIMITE).find({ suppressAuth: true }),
+    ]);
+    const porteurs = membres.items.filter((m) => m.actif !== false
+      && asArr(m.type).some((t) => t && sansAccents(t.statut) === STATUT)).length;
+    const institutions = organisations.items.length;
+    const nbResidents = residents.items.filter((r) => r.actif !== false).length;
+    console.log('[LPC][porteurs-public] compteurs · version', VERSION, '·', porteurs, 'porteurs,', institutions, 'institutions,', nbResidents, 'résidents');
+    return { ok: true, porteurs, institutions, residents: nbResidents };
+  } catch (e) {
+    console.error('[LPC][porteurs-public] compteurs KO :', e && e.message);
+    return { ok: false };
   }
 });
