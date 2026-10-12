@@ -17,7 +17,7 @@ const updateMember = elevate(members.updateMember);   // « Manage Members »
  *   - membre avec une organisation liée -> MISE À JOUR de cette organisation (20/09 : plus de doublon
  *     quand la même personne a déjà rempli F2)
  *   - sinon -> CRÉATION d'une organisation + organisation_id renseigné
- *   - pas de dédoublonnage automatique ; l'alerte signale un homonyme (nom + localité)
+ *   - pas de dédoublonnage automatique ; l'alerte signale un homonyme (nom + adresse)
  *   - Organisations.types / capacites : remplacement LIMITÉ au périmètre du formulaire
  *     (les types/capacités du genre Accueillant posés par F2 sont conservés)
  *   - types proposés = Organisations_Types dont Genre contient « Partenaire »
@@ -275,7 +275,7 @@ export const submitPartenaire = webMethod(Permissions.SiteMember, async (payload
   await wixData.replaceReferences(COL_ORGS, 'types', orgId, typesFinal, { suppressAuth: true });
   await wixData.replaceReferences(COL_ORGS, 'capacites', orgId, capsFinal, { suppressAuth: true });
 
-  // Homonyme possible (même nom + même localité) : signalé à l’équipe, pas de fusion auto
+  // Homonyme possible (même nom + même adresse) : signalé à l’équipe, pas de fusion auto
   let homonyme = false;
   try {
     const cands = (await wixData.query(COL_ORGS).contains('nom', organisme).ne('_id', orgId)

@@ -561,7 +561,7 @@ export const creerMonOrganisation = webMethod(Permissions.SiteMember, async (pay
   await wixData.replaceReferences(COL_MEMBRES, 'type', rowId, statutsFinal, { suppressAuth: true });
   console.log('[LPC][Profil] organisation créée', orgId, '| type :', typeRow.type, '| statuts ajoutés :', statutsAjoutes.map((s) => s.statut).join(', '));
 
-  // Homonyme (même nom + même localité) : signalé à l’équipe, pas de fusion automatique
+  // Homonyme (même nom + même adresse) : signalé à l’équipe, pas de fusion automatique
   let homonyme = false;
   try {
     const cands = (await wixData.query(COL_ORGS).contains('nom', nom).ne('_id', orgId).limit(50).find({ suppressAuth: true })).items;
