@@ -27,8 +27,8 @@ import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
 import { adminTotaux, adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 
-const VERSION = '2026-10-12-d';   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
-const TEXTE_LIBRE = ['infosimportantes', 'interets'];
+const VERSION = '2026-10-12-e';   // 12/10 (e) : onglet Organismes : colonne Adresse (c4 / h4) à la place de Localité ;   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const TEXTE_LIBRE = ['infosimportantes', 'interets', 'adresse'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
 // Page d'édition par onglet (mode admin). Résidents : /adminresidents = gestion des résidents de l'ORGANISME du résident choisi.
@@ -51,7 +51,7 @@ const COLONNES = {
     col('localite', 'Localité'), col('statuts', 'Statuts'), col('organisation', 'Organisme', { lien: 'organisme-membre' }),
     col('cartes', 'Cartes (en cours / max)'), CREE, MODIFIE],
   organismes: [col('nom', 'Nom', { lien: 'fiche' }), col('types', 'Type'), col('genres', 'Genre'),
-    col('localite', 'Localité'), col('contact', 'Contact', { lien: 'contact' }), col('membres', 'Membres'),
+    col('adresse', 'Adresse'), col('contact', 'Contact', { lien: 'contact' }), col('membres', 'Membres'),
     col('jumeles', 'Jumelés', { lien: 'jumelage-org' }), col('actifs', 'Résidents', { lien: 'residents-org' }), CREE, MODIFIE],
   residents: [col('nom', 'Résident'), col('institution', 'Organisme', { lien: 'organisme' }), col('chambre', 'Chambre'),
     col('infosimportantes', 'Infos importantes'), col('interets', 'Intérêts'), CREE, MODIFIE,

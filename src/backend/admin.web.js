@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-12-e';
+const VERSION = '2026-10-12-f';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -226,7 +226,7 @@ async function lignesOrganismes() {
       nom: o.nom || '(sans nom)',
       types: libelles.join(', '),
       genres: genres.join(', '),
-      localite: o.localite || '',
+      adresse: o.adresse || '',   // 12/10 : l'onglet Organismes affiche l'adresse (c4), plus la localité
       contact: contactDe(o._id),
       membres: String(nbMembres.get(o._id) || 0),
       jumeles: String(sr.jumeles),      // résidents jumelés (lien : /adminjumelages de l'organisme)
