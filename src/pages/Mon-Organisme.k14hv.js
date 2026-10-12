@@ -491,6 +491,7 @@ function initLogo(url, consentement) {
   if (!url) { cacherEl(apercu); cacherEl(retrait); return; }
   if (apercu) { try { apercu.src = url; if (apercu.alt !== undefined) apercu.alt = 'Logo actuel'; } catch (e) { console.warn('[LPC][logo] aperçu KO :', e && e.message); } montrerEl(apercu); }
   if (retrait && typeof retrait.onClick === 'function') {
+    try { if ('label' in retrait) retrait.label = 'Retirer ce logo'; } catch (e) { /* ignoré */ }
     montrerEl(retrait);
     retrait.onClick(() => {
       logoASupprimer = true;

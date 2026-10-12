@@ -106,7 +106,7 @@ const COLONNES_JUM = [
 ];
 
 $w.onReady(async () => {
-  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-c');
+  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-d (case du logo non grisée)');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminOrganisme'));
   safe('masquage erreur', hideErr);
@@ -261,7 +261,9 @@ function griserRgpd(valeurCoche) {
   const motif = /rgpd|consent|donn[ée]es|accord|accept|traitement/i;
   let cases = [];
   try { const t = $w('Checkbox'); for (let i = 0; i < t.length; i++) cases.push(t[i]); } catch (e) { cases = []; }
-  const visees = cases.filter((c) => motif.test(String(c.id || '') + ' ' + String(c.label || '')));
+  // 12/10 : la case d'autorisation du logo (#consentementlogo) répond au motif « consent » mais n'est PAS l'accord RGPD : exclue,
+  // sinon elle était décochée et grisée (donc impossible à cocher : le logo n'était jamais envoyé)
+  const visees = cases.filter((c) => motif.test(String(c.id || '') + ' ' + String(c.label || '')) && !/logo/i.test(String(c.id || '')));
   console.log('[LPC][AdminOrganisme] cases à cocher :', cases.map((c) => '#' + c.id + ' « ' + String(c.label || '').slice(0, 40) + ' »').join(' | ') || '(aucune)',
     '| grisées :', visees.map((c) => '#' + c.id).join(', ') || '(aucune)');
   visees.forEach((c) => {
@@ -801,6 +803,7 @@ function initLogo(url, consentement) {
   if (!url) { cacherEl(apercu); cacherEl(retrait); return; }
   if (apercu) { try { apercu.src = url; if (apercu.alt !== undefined) apercu.alt = 'Logo actuel'; } catch (e) { console.warn('[LPC][logo] aperçu KO :', e && e.message); } montrerEl(apercu); }
   if (retrait && typeof retrait.onClick === 'function') {
+    try { if ('label' in retrait) retrait.label = 'Retirer ce logo'; } catch (e) { /* ignoré */ }
     montrerEl(retrait);
     retrait.onClick(() => {
       logoASupprimer = true;

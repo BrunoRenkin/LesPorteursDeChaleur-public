@@ -392,6 +392,7 @@ function afficherLogoExistant(url) {
     try { apercu.src = url; if (apercu.alt !== undefined) apercu.alt = 'Logo actuel'; if (apercu.expand) apercu.expand(); apercu.show(); } catch (e) { console.warn('[LPC][F2] aperçu du logo KO :', e && e.message); }
   }
   if (retrait && typeof retrait.onClick === 'function') {
+    try { if ('label' in retrait) retrait.label = 'Retirer ce logo'; } catch (e) { /* ignoré */ }
     try { if (retrait.expand) retrait.expand(); retrait.show(); } catch (e) { /* ignoré */ }
     retrait.onClick(() => {
       logoASupprimer = true;
