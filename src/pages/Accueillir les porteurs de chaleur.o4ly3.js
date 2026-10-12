@@ -32,6 +32,7 @@ const EL = {
 // Logo de l'organisation (12/10) : bouton de téléversement ajouté par Bruno ; ID non connus du code -> candidats, puis le seul UploadButton de la page.
 // Aperçu du logo déjà enregistré et bouton de retrait : FACULTATIFS.
 const LOGO_UPLOAD_IDS = ['#uploadLogo', '#uploadButtonLogo', '#logoUpload', '#logo', '#uploadButton1'];
+const LOGO_CONSENT_IDS = ['#consentementlogo', '#consentementLogo'];   // case « j'autorise l'utilisation du logo » (exigée avec un nouveau fichier)
 const LOGO_APERCU_IDS = ['#logoActuel', '#imageLogo', '#logoApercu', '#apercuLogo'];
 const LOGO_RETRAIT_IDS = ['#retirerLogo', '#supprimerLogo', '#btnRetirerLogo', '#buttonRetirerLogo'];
 let logoASupprimer = false;
@@ -40,7 +41,7 @@ const PAGE_MERCI = '/accueillir-les-porteurs-mes-residents';
 const SOUHAITS_OBLIGATOIRES = true;   // >= 1 case cochee exigee
 
 $w.onReady(async () => {
-  console.log('[LPC][F2] version du code : 2026-10-12-a (logo de l’organisation)');
+  console.log('[LPC][F2] version du code : 2026-10-12-b (logo de l’organisation + consentement)');
   console.log('[LPC][F2] champs obligatoires', { souhaits: SOUHAITS_OBLIGATOIRES });
   // Masquer l'erreur AVANT tout appel réseau (sinon elle reste visible si la suite échoue)
   safe('masquage erreur', hideErr);
@@ -112,6 +113,11 @@ $w.onReady(async () => {
   }
   console.log('[LPC][F2] organisation chargée', { orgExiste: Boolean(d.orgExiste), nomOrigine, type: d.organismeType });
   safe('logo existant', () => afficherLogoExistant(d.logoUrl));
+  safe('consentement du logo', () => {
+    const c = premierPresent(LOGO_CONSENT_IDS);
+    console.log('[LPC][F2] consentement du logo : case', c ? '#' + c.id : 'INTROUVABLE', '| enregistré :', d.consentementLogo === true);
+    if (c) c.checked = Boolean(d.logoUrl) && d.consentementLogo === true;
+  });
 
   // consentement RGPD : jamais pré-coché (consentement actif à chaque envoi)
 
@@ -147,6 +153,14 @@ $w.onReady(async () => {
     if (nb && !/^\d+$/.test(nb.replace(/\s/g, ''))) {
       manque.push('indiquer le nombre approximatif de personnes concernées en chiffres');
     }
+    // Logo : un fichier en attente exige l'autorisation de l'utiliser (12/10)
+    try {
+      const upL = boutonLogo();
+      const caseL = premierPresent(LOGO_CONSENT_IDS);
+      if (upL && upL.value && upL.value.length > 0 && caseL && caseL.checked !== true) {
+        manque.push('cocher la case d’autorisation d’utilisation de votre logo (ou retirer le fichier)');
+      }
+    } catch (e) { /* ignoré : le serveur contrôle aussi */ }
     if (!coche(EL.consentement)) {
       manque.push('cocher la case "accepter le traitement de vos données" indispensable pour que nous puissions traiter votre demande');
     }
@@ -206,10 +220,14 @@ $w.onReady(async () => {
         consentement: coche(EL.consentement),
         logoUrl,
         supprimerLogo: logoASupprimer,
+        consentementLogo: (() => { const c = premierPresent(LOGO_CONSENT_IDS); return c ? c.checked === true : undefined; })(),
       });
       console.log('[LPC][F2] réponse du serveur', res, '| alerte interne :', res && res.notify);
       if (res && res.ok) {
         wixLocation.to(PAGE_MERCI);
+      } else if (res && res.reason === 'consentement-logo-requis') {
+        showErr('Merci de cocher la case d’autorisation d’utilisation de votre logo.');
+        bouton.enable();
       } else if (res && res.reason === 'logo-invalide') {
         showErr('Le logo n’a pas été accepté : merci de choisir une image (PNG, JPG ou WebP).');
         bouton.enable();
@@ -377,6 +395,7 @@ function afficherLogoExistant(url) {
     try { if (retrait.expand) retrait.expand(); retrait.show(); } catch (e) { /* ignoré */ }
     retrait.onClick(() => {
       logoASupprimer = true;
+      try { const c = premierPresent(LOGO_CONSENT_IDS); if (c) c.checked = false; } catch (e) { /* ignoré */ }
       if (apercu) { try { apercu.hide(); if (apercu.collapse) apercu.collapse(); } catch (e) { /* ignoré */ } }
       try { retrait.hide(); if (retrait.collapse) retrait.collapse(); } catch (e) { /* ignoré */ }
     });

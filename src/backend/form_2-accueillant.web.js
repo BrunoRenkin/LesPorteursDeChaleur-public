@@ -192,6 +192,7 @@ export const getMyAccueillantData = webMethod(Permissions.SiteMember, async () =
         capacites: (org.capacites || []).map((r) => r && r.capacite).filter(Boolean),
         commentaire: fromRichText(org.commentaire),
         logoUrl: typeof org.logo === 'string' ? org.logo : '',   // 12/10 : logo de l'organisation (champ Image `logo`)
+        consentementLogo: org.consentement_logo === true,        // 12/10 : autorisation d'utiliser le logo (case #consentementlogo)
       });
     }
   }
@@ -210,6 +211,7 @@ export const getMyAccueillantData = webMethod(Permissions.SiteMember, async () =
  *             nombreDestinataires: string|number, capacites: string[], commentaire: string,
  *             consentement: boolean,
  *             logoUrl?: string,         // 12/10 : URI Wix Media (wix:image://…) du logo téléversé par la page (uploadFiles)
+ *             consentementLogo?: boolean, // exigé avec un nouveau logo ; sinon reflète l'état de la case (retrait de l'autorisation)
  *             supprimerLogo?: boolean } // retire le logo déjà enregistré (ignoré si logoUrl est fourni)
  */
 export const submitAccueillant = webMethod(Permissions.SiteMember, async (payload = {}) => {
@@ -236,6 +238,8 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
     return { ok: false, reason: 'logo-invalide' };
   }
   const supprimerLogo = payload.supprimerLogo === true && !logoUrl;
+  // Un nouveau logo exige l'autorisation de l'utiliser (case #consentementlogo), comme le consentement image de la photo de F1
+  if (logoUrl && payload.consentementLogo !== true) return { ok: false, reason: 'consentement-logo-requis' };
 
   // Type de lieu : libellé reçu, sinon type par défaut
   let typeIds = await labelsToIds(COL_ORG_TYPES, 'type', payload.organismeType);
@@ -271,8 +275,9 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
       org.localite = localite;
       org.nombre_destinataires = nombre;
       org.commentaire = toRichText(commentaire);
-      if (logoUrl) org.logo = logoUrl;            // nouveau logo -> écrase ; sinon on garde l'existant
-      else if (supprimerLogo) org.logo = '';      // retrait demandé
+      if (logoUrl) { org.logo = logoUrl; org.consentement_logo = true; }   // nouveau logo -> écrase ; sinon on garde l'existant
+      else if (supprimerLogo) { org.logo = ''; org.consentement_logo = false; }   // retrait demandé
+      else if (org.logo && typeof payload.consentementLogo === 'boolean') org.consentement_logo = payload.consentementLogo;   // autorisation retirée ou redonnée (le fichier est conservé, l'affichage public doit tester ce booléen)
       delete org.types; delete org.capacites;   // via replaceReferences
       orgId = (await wixData.update(COL_ORGS, org, { suppressAuth: true }))._id;
       console.log('[LPC][F2] organisation mise à jour', orgId);
@@ -286,7 +291,7 @@ export const submitAccueillant = webMethod(Permissions.SiteMember, async (payloa
       pays: 'Belgique',
       ...(nombre == null ? {} : { nombre_destinataires: nombre }),
       commentaire: toRichText(commentaire),
-      ...(logoUrl ? { logo: logoUrl } : {}),
+      ...(logoUrl ? { logo: logoUrl, consentement_logo: true } : {}),
     }, { suppressAuth: true }))._id;
     console.log('[LPC][F2] organisation créée', orgId, linkedOrgId ? `(remplace le lien ${linkedOrgId})` : '');
   }
