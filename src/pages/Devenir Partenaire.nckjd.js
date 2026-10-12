@@ -33,7 +33,7 @@ const MESSAGE_OBLIGATOIRE = false;        // passer à true si le message doit �
 const PROPOSITIONS_OBLIGATOIRES = true;   // >= 1 case cochée exigée (passer à false pour rendre facultatif)
 
 $w.onReady(async () => {
-  console.log('[LPC][F3] version du code : 2026-10-06-a');
+  console.log('[LPC][F3] version du code : 2026-10-12-a (logo de l’organisation)');
   console.log('[LPC][F3] champs obligatoires', { propositions: PROPOSITIONS_OBLIGATOIRES, message: MESSAGE_OBLIGATOIRE });
   // Masquer l'erreur AVANT tout appel réseau (sinon elle reste visible si la suite échoue)
   safe('masquage erreur', hideErr);
@@ -100,6 +100,7 @@ $w.onReady(async () => {
     });
   }
   console.log('[LPC][F3] organisation chargée', { orgExiste: Boolean(d.orgExiste), nomOrigine, type: d.organismeType });
+  safe('logo', () => initLogo(d.logoUrl, d.consentementLogo));
 
   // consentement RGPD : jamais pré-coché (consentement actif à chaque envoi)
 
@@ -134,6 +135,7 @@ $w.onReady(async () => {
     if (MESSAGE_OBLIGATOIRE && !(valeur(EL.commentaire) || '').trim()) {
       manque.push('nous dire comment vous envisagez cette collaboration');
     }
+    if (logoSansConsentement()) manque.push('cocher la case d’autorisation d’utilisation de votre logo (ou retirer le fichier)');
     if (!coche(EL.consentement)) {
       manque.push('cocher la case "accepter le traitement de vos données" indispensable pour que nous puissions traiter votre demande');
     }
@@ -160,6 +162,17 @@ $w.onReady(async () => {
     }
 
     bouton.disable();
+
+    // Téléversement du logo (si un fichier est en attente) : en cas d'échec on interrompt, rien n'est perdu en silence
+    let logoUrl = '';
+    try { logoUrl = await televerserLogo(); }
+    catch (e) {
+      console.error('[LPC][F3] upload logo KO:', e);
+      showErr(MSG_LOGO_ECHEC);
+      bouton.enable();
+      return;
+    }
+
     try {
       const res = await submitPartenaire({
         prenom: valeur(EL.prenom),
@@ -172,10 +185,19 @@ $w.onReady(async () => {
         capacites: valeur(EL.capacites),
         commentaire: valeur(EL.commentaire),
         consentement: coche(EL.consentement),
+        logoUrl,
+        supprimerLogo: logoASupprimer,
+        consentementLogo: consentementLogoCoche(),
       });
       console.log('[LPC][F3] réponse du serveur', res, '| alerte interne :', res && res.notify);
       if (res && res.ok) {
         wixLocation.to(PAGE_MERCI);
+      } else if (res && res.reason === 'consentement-logo-requis') {
+        showErr(MSG_LOGO_CONSENT);
+        bouton.enable();
+      } else if (res && res.reason === 'logo-invalide') {
+        showErr(MSG_LOGO_INVALIDE);
+        bouton.enable();
       } else {
         showErr('L\'envoi a échoué, merci de réessayer dans un instant.');
         bouton.enable();
@@ -329,3 +351,78 @@ async function afficherEmailConnecte() {
     console.error('[LPC][F3] lecture de l’e-mail KO :', err);
   }
 }
+
+// ─── logo de l'organisation (12/10) ──────────────────────────────────────
+// Éléments (ajoutés par Bruno) : #uploadLogo (téléversement), #consentementlogo (autorisation, exigée avec un nouveau fichier),
+// #logoActuel (aperçu du logo enregistré) et #retirerLogo (retrait). Tous tolérés absents (avertissement console).
+const LOGO_UPLOAD_IDS = ['#uploadLogo', '#uploadButtonLogo', '#logoUpload', '#logo'];
+const LOGO_CONSENT_IDS = ['#consentementlogo', '#consentementLogo'];
+const LOGO_APERCU_IDS = ['#logoActuel', '#imageLogo', '#logoApercu', '#apercuLogo'];
+const LOGO_RETRAIT_IDS = ['#retirerLogo', '#supprimerLogo', '#btnRetirerLogo', '#buttonRetirerLogo'];
+let logoASupprimer = false;
+
+function premierPresent(ids) {
+  for (const id of ids) {
+    try { const e = $w(id); if (e && typeof e.type === 'string') return e; } catch (err) { /* suivant */ }
+  }
+  return null;
+}
+/** Le bouton de téléversement du logo (doit exposer uploadFiles), sinon l'unique UploadButton de la page. */
+function boutonLogo() {
+  for (const id of LOGO_UPLOAD_IDS) {
+    try { const e = $w(id); if (e && typeof e.uploadFiles === 'function') return e; } catch (err) { /* suivant */ }
+  }
+  try {
+    const tous = $w('UploadButton');
+    if (tous && tous.length === 1) return tous[0];
+  } catch (e) { /* type non supporté */ }
+  return null;
+}
+/** Aperçu et retrait du logo déjà enregistré ; case d'autorisation préremplie. */
+function initLogo(url, consentement) {
+  const up = boutonLogo();
+  const caseL = premierPresent(LOGO_CONSENT_IDS);
+  const apercu = premierPresent(LOGO_APERCU_IDS);
+  const retrait = premierPresent(LOGO_RETRAIT_IDS);
+  console.log('[LPC][logo] téléversement', up ? '#' + up.id : 'INTROUVABLE', '| case', caseL ? '#' + caseL.id : 'INTROUVABLE',
+    '| aperçu', apercu ? '#' + apercu.id : 'absent', '| retrait', retrait ? '#' + retrait.id : 'absent', '| logo enregistré :', Boolean(url));
+  if (caseL) { try { caseL.checked = Boolean(url) && consentement === true; } catch (e) { /* ignoré */ } }
+  const cacherEl = (e) => { if (!e) return; try { e.hide(); if (e.collapse) e.collapse(); } catch (x) { /* ignoré */ } };
+  const montrerEl = (e) => { if (!e) return; try { if (e.expand) e.expand(); e.show(); } catch (x) { /* ignoré */ } };
+  if (!url) { cacherEl(apercu); cacherEl(retrait); return; }
+  if (apercu) { try { apercu.src = url; if (apercu.alt !== undefined) apercu.alt = 'Logo actuel'; } catch (e) { console.warn('[LPC][logo] aperçu KO :', e && e.message); } montrerEl(apercu); }
+  if (retrait && typeof retrait.onClick === 'function') {
+    montrerEl(retrait);
+    retrait.onClick(() => {
+      logoASupprimer = true;
+      cacherEl(apercu); cacherEl(retrait);
+      if (caseL) { try { caseL.checked = false; } catch (e) { /* ignoré */ } }
+    });
+  }
+}
+/** Téléverse le fichier en attente ; renvoie l'URI Wix Media, '' s'il n'y en a pas, lève une erreur en cas d'échec. */
+async function televerserLogo() {
+  const up = boutonLogo();
+  if (!up || !up.value || !up.value.length) return '';
+  const files = await up.uploadFiles();
+  const url = files && files.length ? (files[0].fileUrl || files[0].url || '') : '';
+  console.log('[LPC][logo] uploadFiles ->', url ? 'ok' : 'sans adresse');
+  if (!url) throw new Error('uploadFiles sans adresse');
+  return url;
+}
+/** Vrai si un fichier est en attente alors que la case d'autorisation n'est pas cochée. */
+function logoSansConsentement() {
+  try {
+    const up = boutonLogo();
+    const c = premierPresent(LOGO_CONSENT_IDS);
+    return Boolean(up && up.value && up.value.length > 0 && c && c.checked !== true);
+  } catch (e) { return false; }
+}
+/** État de la case d'autorisation (undefined si la case est absente). */
+function consentementLogoCoche() {
+  const c = premierPresent(LOGO_CONSENT_IDS);
+  return c ? c.checked === true : undefined;
+}
+const MSG_LOGO_ECHEC = 'Le téléversement du logo a échoué. Merci de réessayer, ou de retirer le fichier pour enregistrer sans logo.';
+const MSG_LOGO_CONSENT = 'Merci de cocher la case d’autorisation d’utilisation du logo (ou de retirer le fichier).';
+const MSG_LOGO_INVALIDE = 'Le logo n’a pas été accepté : merci de choisir une image (PNG, JPG ou WebP).';

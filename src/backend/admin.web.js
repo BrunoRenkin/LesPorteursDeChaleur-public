@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-12-c';
+const VERSION = '2026-10-12-d';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -953,6 +953,8 @@ export const adminOrganismeCourant = webMethod(Permissions.SiteMember, async () 
       capacites: libelles(org.capacites, 'capacite'),
       nombreDestinataires: org.nombre_destinataires == null ? '' : String(org.nombre_destinataires),
       commentaire: fromRichText(org.commentaire),
+      logoUrl: typeof org.logo === 'string' ? org.logo : '',   // 12/10 : logo de l'organisation
+      consentementLogo: org.consentement_logo === true,
     },
     // Liste des membres rattachés : le nom sert de lien vers leur fiche (désignés par leur RANG, jamais par identifiant)
     membres: rattaches.map((m, rang) => ({
@@ -1033,8 +1035,27 @@ export const adminOuvrirMembreRattache = webMethod(Permissions.SiteMember, async
   return { ok: true };
 });
 
+/** Logo d'organisation (12/10) : { logoUrl, supprimerLogo, consentementLogo } ou { refus }. Seule une image Wix Media est acceptée ;
+ *  un nouveau logo exige l'autorisation de l'utiliser. */
+function lireLogo(payload) {
+  const logoUrl = clean(payload.logoUrl, 2000);
+  if (logoUrl && !/^wix:image:\/\/v1\//.test(logoUrl)) return { refus: 'logo-invalide' };
+  if (logoUrl && payload.consentementLogo !== true) return { refus: 'consentement-logo-requis' };
+  return {
+    logoUrl,
+    supprimerLogo: payload.supprimerLogo === true && !logoUrl,
+    consentementLogo: typeof payload.consentementLogo === 'boolean' ? payload.consentementLogo : undefined,
+  };
+}
+/** Applique le logo à la fiche : nouveau fichier (+ accord) ; retrait (accord à faux) ; sinon l'état de la case (le fichier est conservé). */
+function appliquerLogo(fiche, l) {
+  if (l.logoUrl) { fiche.logo = l.logoUrl; fiche.consentement_logo = true; }
+  else if (l.supprimerLogo) { fiche.logo = ''; fiche.consentement_logo = false; }
+  else if (fiche.logo && l.consentementLogo !== undefined) fiche.consentement_logo = l.consentementLogo;
+}
+
 /**
- * payload = { ticket, nom, type, localite, nombreDestinataires, capacites: string[], commentaire }
+ * payload = { ticket, nom, type, localite, nombreDestinataires, capacites: string[], commentaire, logoUrl?, supprimerLogo?, consentementLogo? }
  * Mêmes règles que « Mon organisme » : `types` et `capacites` remplacés DANS LE PÉRIMÈTRE des deux genres
  * (Accueillant + Partenaire), le reste conservé.
  * payload.contact = { rang, nom, telephone, fonction } (facultatif) : téléphone et fonction du PREMIER membre rattaché,
@@ -1067,11 +1088,17 @@ export const adminEnregistrerOrganisme = webMethod(Permissions.SiteMember, async
   const fusion = (avant, nouveaux, perimetre) =>
     Array.from(new Set([...asArr(avant).filter((id) => !perimetre.includes(id)), ...asArr(nouveaux)]));
 
+  const logo = lireLogo(payload);
+  if (logo.refus) return { ok: false, reason: logo.refus };
+
   const maj = { ...org };
   maj.nom = nom;
   maj.localite = localite;
   maj.commentaire = toRichText(commentaire);
   if (nombre != null) maj.nombre_destinataires = nombre;
+  const logoAvant = org.logo ? 'oui' : 'non';
+  const accordAvant = org.consentement_logo === true;
+  appliquerLogo(maj, logo);
   delete maj.types; delete maj.capacites;   // via replaceReferences
   await wixData.update('Organisations', maj, { suppressAuth: true });
   await wixData.replaceReferences('Organisations', 'types', org._id, fusion(typesAvant, typeIds, perimetreTypes), { suppressAuth: true });
@@ -1114,6 +1141,9 @@ export const adminEnregistrerOrganisme = webMethod(Permissions.SiteMember, async
   // Journal : noms des champs, plus l'ancien nom en cas de renommage (l'organisme n'est pas une personne)
   await journaliser(admin, 'modifier:organismes', org._id,
     'champs : nom, type, localite, nombre_destinataires, capacites, commentaire · contact : ' + contact
+    + (logo.logoUrl || logo.supprimerLogo || accordAvant !== (maj.consentement_logo === true)
+      ? ' · logo : ' + (logo.logoUrl ? 'ajouté' : logo.supprimerLogo ? 'retiré' : 'accord modifié') + ' (avant : ' + logoAvant + ', accord ' + accordAvant + ' -> ' + (maj.consentement_logo === true) + ')'
+      : '')
     + (pushWix === null ? '' : ' (push Wix : ' + pushWix + ')')
     + (norm(org.nom) !== norm(nom) ? ' · renommé : ' + clean(org.nom, 200) + ' -> ' + nom : ''));
   return { ok: true, version: VERSION, pushWix };

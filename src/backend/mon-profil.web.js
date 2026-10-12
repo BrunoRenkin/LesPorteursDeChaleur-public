@@ -284,6 +284,8 @@ export const getMonProfil = webMethod(Permissions.SiteMember, async () => {
         capacites: libelles(org.capacites, 'capacite'),
         nombreDestinataires: org.nombre_destinataires == null ? '' : String(org.nombre_destinataires),
         commentaire: fromRichText(org.commentaire),
+        logoUrl: typeof org.logo === 'string' ? org.logo : '',   // 12/10 : logo de l'organisation
+        consentementLogo: org.consentement_logo === true,
       };
     }
   }
@@ -420,8 +422,27 @@ export const enregistrerMonProfil = webMethod(Permissions.SiteMember, async (pay
     statuts: statutsFinaux, organisation: Boolean(await organisationExistante(row)) };
 });
 
+/** Logo d'organisation (12/10) : { logoUrl, supprimerLogo, consentementLogo } ou { refus }. Seule une image Wix Media est acceptée ;
+ *  un nouveau logo exige l'autorisation de l'utiliser. */
+function lireLogo(payload) {
+  const logoUrl = clean(payload.logoUrl, 2000);
+  if (logoUrl && !/^wix:image:\/\/v1\//.test(logoUrl)) return { refus: 'logo-invalide' };
+  if (logoUrl && payload.consentementLogo !== true) return { refus: 'consentement-logo-requis' };
+  return {
+    logoUrl,
+    supprimerLogo: payload.supprimerLogo === true && !logoUrl,
+    consentementLogo: typeof payload.consentementLogo === 'boolean' ? payload.consentementLogo : undefined,
+  };
+}
+/** Applique le logo à la fiche : nouveau fichier (+ accord) ; retrait (accord à faux) ; sinon l'état de la case (le fichier est conservé). */
+function appliquerLogo(fiche, l) {
+  if (l.logoUrl) { fiche.logo = l.logoUrl; fiche.consentement_logo = true; }
+  else if (l.supprimerLogo) { fiche.logo = ''; fiche.consentement_logo = false; }
+  else if (fiche.logo && l.consentementLogo !== undefined) fiche.consentement_logo = l.consentementLogo;
+}
+
 /**
- * payload = { nom, type, localite, nombreDestinataires, capacites: string[], commentaire }
+ * payload = { nom, type, localite, nombreDestinataires, capacites: string[], commentaire, logoUrl?, supprimerLogo?, consentementLogo? }
  * Met à jour l'organisation DÉJÀ liée. Aucune création : sans organisation, renvoie
  * { ok:false, reason:'pas-d-organisation' } et la page invite à passer par F2 ou F3.
  */
@@ -460,11 +481,15 @@ export const enregistrerMonOrganisation = webMethod(Permissions.SiteMember, asyn
   const fusion = (avant, nouveaux, perimetre) =>
     Array.from(new Set([...asArr(avant).filter((id) => !perimetre.includes(id)), ...asArr(nouveaux)]));
 
+  const logo = lireLogo(payload);
+  if (logo.refus) return { ok: false, reason: logo.refus };
+
   const maj = { ...org };
   maj.nom = nom;
   maj.localite = localite;
   maj.commentaire = toRichText(commentaire);
   if (nombre != null) maj.nombre_destinataires = nombre;
+  appliquerLogo(maj, logo);
   delete maj.types; delete maj.capacites;   // via replaceReferences
   await wixData.update(COL_ORGS, maj, { suppressAuth: true });
 
@@ -512,6 +537,9 @@ export const creerMonOrganisation = webMethod(Permissions.SiteMember, async (pay
   const perimetreCaps = (await wixData.query(COL_CAPACITES).hasSome('typesDeMembre', statutIdsAjoutes).limit(200).find({ suppressAuth: true })).items.map((r) => r._id);
   const capIds = (await labelsToIds(COL_CAPACITES, 'capacite', payload.capacites)).filter((id) => perimetreCaps.includes(id));
 
+  const logo = lireLogo(payload);   // 12/10 : logo à la création (accord exigé avec un fichier)
+  if (logo.refus) return { ok: false, reason: logo.refus };
+
   const statutIdsAvant = idsOf(row.type);   // lus AVANT tout delete sur la copie
   const orgId = (await wixData.insert(COL_ORGS, {
     nom,
@@ -519,6 +547,7 @@ export const creerMonOrganisation = webMethod(Permissions.SiteMember, async (pay
     pays: 'Belgique',
     ...(nombre == null ? {} : { nombre_destinataires: nombre }),
     commentaire: toRichText(commentaire),
+    ...(logo.logoUrl ? { logo: logo.logoUrl, consentement_logo: true } : {}),
   }, { suppressAuth: true }))._id;
   await wixData.replaceReferences(COL_ORGS, 'types', orgId, [typeRow._id], { suppressAuth: true });
   await wixData.replaceReferences(COL_ORGS, 'capacites', orgId, capIds, { suppressAuth: true });
