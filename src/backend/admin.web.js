@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-12-f';
+const VERSION = '2026-10-12-g';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -79,6 +79,12 @@ const dates = (r) => ({ cree: jour(r._createdDate), modifie: jour(r._updatedDate
 const clean = (s, m = 200) => (typeof s === 'string' ? s.trim().slice(0, m) : '');
 const asArr = (x) => (Array.isArray(x) ? x : x == null || x === '' ? [] : [x]);
 const idsOf = (r) => asArr(r).map((x) => (typeof x === 'string' ? x : x && x._id)).filter(Boolean);
+/** Vrai si `texte` contient `mots` comme suite de MOTS ENTIERS (sans accents ni ponctuation) : « Rue X, 1000 Bruxelles » contient « bruxelles », pas « bru ». */
+const contientMots = (texte, mots) => {
+  const norme = (s) => ' ' + sansAccents(s).replace(/[^a-z0-9]+/g, ' ').trim() + ' ';
+  const m = norme(mots);
+  return m.trim() !== '' && norme(texte).includes(m);
+};
 const sansAccents = (s) => String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
 const ecrit = (caps) => asArr(caps).some((c) => c && sansAccents(c.capacite).includes('ecrire'));
 
@@ -1236,7 +1242,8 @@ async function donneesJumelage(mode, cibleId, porteurDemande) {
     // périmètre, jumelés ou non (un jumelé à un autre porteur n'a ni bouton ni action : « Jumelé avec Nom »).
     if (j && !avecChoisi && mode === 'porteur') return;
     const o = org.get(idsOf(r.organisation_id)[0]);
-    const localite = (o && o.localite) || '';
+    const localiteOrg = (o && o.localite) || '';
+    const adresse = (o && o.adresse) || localiteOrg;   // 12/10 : l'adresse de l'organisme, à défaut sa localité (organismes anciens)
     // Deux actions seulement (Bruno, 02/10) : « Annuler » pour un résident jumelé (quel que soit le porteur), « Jumeler » pour un
     // résident actif sans porteur quand un porteur avec des places libres est choisi. Changer de porteur = Annuler, puis Jumeler.
     let action = '';
@@ -1250,7 +1257,7 @@ async function donneesJumelage(mode, cibleId, porteurDemande) {
       id: r._id,
       nom: nomResident(r),
       institution: (o && o.nom) || '',
-      localite,
+      adresse: String(adresse).slice(0, 200),
       chambre: r.numero_chambre || '',
       infosimportantes: String(r.infosimportantes || '').slice(0, 300),
       interets: String(r.interets || '').slice(0, 300),
@@ -1260,7 +1267,8 @@ async function donneesJumelage(mode, cibleId, porteurDemande) {
       action,
       emailPossible,
       jumelageId: j ? j.jumelageId : '',
-      proche: !!(locPorteur && sansAccents(localite) === locPorteur),
+      // 12/10 : « proche » = la localité de l'organisme est celle du porteur, OU l'adresse de l'organisme contient la localité du porteur (mots entiers)
+      proche: !!(locPorteur && (sansAccents(localiteOrg) === locPorteur || contientMots(adresse, locPorteur))),
     });
   });
   // Mode porteur : résidents de SA localité d'abord ; sinon ordre alphabétique
@@ -1362,7 +1370,7 @@ export const adminAnnulerJumelage = webMethod(Permissions.SiteMember, async (p =
 // Le serveur compose l'e-mail ; la page l'ouvre dans la messagerie de l'administrateur (lien mailto) : RIEN n'est envoyé par le
 // site (envoi à des tiers payant, décision du 22/09) et l'administrateur relit avant d'envoyer.
 // Disponible seulement quand le QUOTA du porteur est REMPLI (jumelages proposés ou actifs >= nbResidentsMax), recontrôlé ici.
-// Contenu : pour chaque résident jumelé, prénom + initiale, établissement (+ localité), centres d'intérêt. JAMAIS les données de santé
+// Contenu : pour chaque résident jumelé, prénom + initiale, établissement (+ adresse, à défaut localité), centres d'intérêt. JAMAIS les données de santé
 // (indicateur_a, indicateur_b) ni infosimportantes : un porteur ne les reçoit pas. Le numéro de chambre est repris depuis le 12/10 (demande de Bruno).
 // Texte destiné à un tiers : pas de tiret cadratin, pas de point final sur les puces (règles de rédaction externe).
 // TEXTE DE BRUNO (04/10), tutoiement, variantes SINGULIER / PLURIEL selon le nombre de résidents jumelés. Rédigé à la voix de l’équipe (signature, adresse de dépôt).
@@ -1433,8 +1441,10 @@ async function composerEmailPorteur(admin, porteurId) {
   lignes.push('Merci pour ton engagement auprès des Porteurs de Chaleur. Voici ' + (plur ? 'les personnes' : 'la personne') + ' à qui tu écriras' + (campagne ? ' pour ' + campagne : '') + ' :');
   liste.forEach((r, i) => {
     const o = orgPar.get(idsOf(r.organisation_id)[0]);
+    const adr = o ? clean(o.adresse, 200) : '';
     const loc = o ? clean(o.localite, 80) : '';
-    const lieu = o ? clean(o.nom, 120) + (loc ? ' à ' + loc : '') : '';   // localité ajoutée seulement si elle est renseignée
+    // 12/10 : « Nom, adresse » ; à défaut d'adresse, l'ancienne forme « Nom à Localité » (localité seulement si renseignée)
+    const lieu = o ? clean(o.nom, 120) + (adr ? ', ' + adr : (loc ? ' à ' + loc : '')) : '';
     const interets = clean(String(r.interets || '').replace(/\s+/g, ' '), 400);
     lignes.push('');
     lignes.push((i + 1) + '. ' + nomResident(r));

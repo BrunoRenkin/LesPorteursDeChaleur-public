@@ -24,10 +24,10 @@ import wixLocation from 'wix-location';
 import { adminTotaux, adminJumelageDonnees, adminJumeler, adminAnnulerJumelage, adminOuvrirResidents, adminEmailPorteur, adminOuvrirOrganismeDuResident, adminOuvrirResidentsDuResident } from 'backend/admin.web';
 import wixWindowFrontend from 'wix-window-frontend';
 
-const TEXTE_LIBRE = ['interets', 'infosimportantes'];   // 07/10 : cellules de texte libre tronquées à l'affichage (2 lignes maximum)
+const TEXTE_LIBRE = ['interets', 'infosimportantes', 'adresse'];   // 07/10 : cellules de texte libre tronquées à l'affichage (2 lignes maximum)
 const LONGUEUR_MAX_CELLULE = 60;
 const coupe = (id, t) => (TEXTE_LIBRE.includes(id) && t.length > LONGUEUR_MAX_CELLULE ? t.slice(0, LONGUEUR_MAX_CELLULE - 1).trimEnd() + '…' : t);
-const VERSION = '2026-10-12-c';   // 12/10 (c) : montrerParents défini (publication refusée en -b : no-undef) ;   // 12/10 (b) : totaux du site en mode « tous les résidents » ;   // 12/10 : bouton « Jumelage » depuis une liste de porteur ou d'organisme = même page, tous les résidents (en place) ;   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
+const VERSION = '2026-10-12-d';   // 12/10 (d) : colonne Adresse (ex-Localité) ;   // 12/10 (c) : montrerParents défini (publication refusée en -b : no-undef) ;   // 12/10 (b) : totaux du site en mode « tous les résidents » ;   // 12/10 : bouton « Jumelage » depuis une liste de porteur ou d'organisme = même page, tous les résidents (en place) ;   // 06/10 (c) : filtre #dropdownfiltre et colonnes triables (en-têtes #h1…#h7, ▲ / ▼)
 const NB_CELLULES = 10;
 const COULEUR_ERREUR = '#C0392B';
 const CLASSE_TEXTE = 'font_8';
@@ -51,7 +51,7 @@ const IDS_SANS_OBJET = ['#TitreLinkAdmin', '#TitreLinkMembre', '#TitreLinkReside
 const AUCUN = '';
 const LIBELLES = { jumeler: 'Jumeler', annuler: 'Annuler' };
 const COLONNES = [
-  { id: 'nom', label: 'Résident', lien: 'residents' }, { id: 'institution', label: 'Organisme', lien: 'organisme' }, { id: 'localite', label: 'Localité' },
+  { id: 'nom', label: 'Résident', lien: 'residents' }, { id: 'institution', label: 'Organisme', lien: 'organisme' }, { id: 'adresse', label: 'Adresse' },
   { id: 'chambre', label: 'Chambre' }, { id: 'interets', label: 'Centres d’intérêt' },
   { id: 'infosimportantes', label: 'Infos importantes' }, { id: 'porteur', label: 'Jumelage' },
 ];
