@@ -21,7 +21,7 @@ import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import { adminResidentsCourants, adminEnregistrerResidents, adminOuvrirOrganismeDepuisResidents } from 'backend/admin.web';
 
-const VERSION = '2026-10-09-a';
+const VERSION = '2026-10-12-a';   // 12/10 : #btnSupprimer masqué pour un résident jumelé (demande de Bruno après le tour du site avec l’équipe)
 const PAGE_ORGANISME = '/adminorganisme';
 const PAGE_LISTE = '/admin?onglet=residents';
 // Retour après enregistrement (04/10) : la page d'où l'on vient, transmise par ?depuis=… (aucun identifiant ; le ticket de l'autre page reste
@@ -221,7 +221,8 @@ function remplirLigne($item, r) {
     } else cacher(aj);
   }
   if (su) {
-    if (r.nouveau) cacher(su);
+    // 12/10 : un résident jumelé ne peut plus être supprimé depuis cette page (jumelage à annuler d'abord, page Jumelage) : bouton masqué
+    if (r.nouveau || jumele) cacher(su);
     else {
       montrer(su);
       try { if ('label' in su) su.label = 'Supprimer'; } catch (e) { /* ignoré */ }

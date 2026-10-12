@@ -1,6 +1,6 @@
 // Code de PAGE « Adminorganisme » (/adminorganisme) : un administrateur modifie la fiche d'un ORGANISME.
 // Page dupliquée de /mon-organisme (mêmes éléments, mêmes ID ou leurs variantes « 1 » : résolution tolérante).
-// version du code : 2026-10-09-a
+// version du code : 2026-10-12-a   (12/10 : tableau #OrgtableJumelage des jumelages de l'organisme)
 //
 // La fiche visée n'apparaît JAMAIS dans l'URL : le clic sur « Modifier » (onglet Organismes de /admin) crée un
 // ticket serveur (backend/admin.web.js, collection Tickets_Admin). Cette page demande au serveur « l'organisme de
@@ -95,8 +95,18 @@ let d = {};
 let ID = {};
 let ticket = '';
 
+// 12/10 : jumelages de l'organisme = pile #OrgAdminboxResidents > titre #OrgAdmintitreJumelages + tableau #OrgtableJumelage
+const IDS_BOX_JUM = ['#OrgAdminboxResidents'];
+const IDS_TITRE_JUM = ['#OrgAdmintitreJumelages'];
+const IDS_TABLE_JUM = ['#OrgtableJumelage'];
+const COLONNES_JUM = [
+  { dataPath: 'resident', label: 'Résident', type: 'string', width: 200 },
+  { dataPath: 'chambre', label: 'Chambre', type: 'string', width: 100 },
+  { dataPath: 'porteur', label: 'Porteur', type: 'string', width: 240 },
+];
+
 $w.onReady(async () => {
-  console.log('[LPC][AdminOrganisme] version du code : 2026-10-09-a');
+  console.log('[LPC][AdminOrganisme] version du code : 2026-10-12-a');
   try { cablerJumelages(); } catch (e) { console.error('[LPC][nav] jumelage KO:', e); }
   safe('inventaire', () => inventaire('AdminOrganisme'));
   safe('masquage erreur', hideErr);
@@ -108,6 +118,7 @@ $w.onReady(async () => {
     // Téléphone et fonction : visibles et ÉDITABLES (ceux du contact, voir remplirContact) ; repliés s'il n'y a aucun membre
     cacher(premier(IDS_TITRE)); cacher(optionnel(EL.repeaterMembres)); IDS_LIEN.forEach((id) => cacher(optionnel(id))); cacher(premier(IDS_LIEN_RESIDENTS)); cacher(premier(IDS_LIEN_JUMELES));   // réaffichés une fois la fiche reçue
     cacher(optionnel(EL.btnResidents)); cacher(optionnel('#btnResidents')); cacher(optionnel(EL.libelleContact));
+    cacher(premier(IDS_BOX_JUM)); cacher(premier(IDS_TITRE_JUM)); cacher(premier(IDS_TABLE_JUM));   // réaffichés par afficherJumelagesOrganisme()
   });
   safe('consentement RGPD grisé', () => griserRgpd(false));
 
@@ -155,6 +166,7 @@ $w.onReady(async () => {
   });
 
   remplir();
+  safe('jumelages de l’organisme', afficherJumelagesOrganisme);
   activerBouton();
   clic(ID.enregistrer, sauver);
 });
@@ -401,6 +413,43 @@ function boutonResidents() {
       ouvrirResidents();
     });
   }
+}
+
+// ─── jumelages de l'organisme (12/10) ────────────────────────────────────
+function montrerParents(el) {
+  try {
+    let x = el && el.parent;
+    for (let i = 0; x && i < 6; i++) {
+      const id = String(x.id || '');
+      if (/^(section|page|masterpage)/i.test(id)) break;
+      if (x.hidden === true || x.collapsed === true) montrer(x);
+      x = x.parent;
+    }
+  } catch (e) { /* ignoré */ }
+}
+/** Titre « Jumelages : N » + tableau (une ligne par jumelage en cours : résident, chambre, porteur). Replié pour un organisme sans résident. */
+function afficherJumelagesOrganisme() {
+  const liste = (d.jumelages && d.jumelages.liste) || [];
+  const box = premier(IDS_BOX_JUM);
+  const titre = premier(IDS_TITRE_JUM);
+  const tab = premier(IDS_TABLE_JUM);
+  console.log('[LPC][AdminOrganisme] jumelages :', liste.length, '| boîte :', box ? box.id : 'introuvable', '| titre :', titre ? titre.id : 'introuvable', '| tableau :', tab ? tab.id : 'introuvable');
+  const r = d.residents || { total: 0 };
+  if (!liste.length && !(d.accueillant === true || r.total > 0)) { cacher(box); cacher(titre); cacher(tab); return; }
+  if (box) { montrer(box); montrerParents(box); }
+  if (titre) {
+    try { titre.text = liste.length ? (liste.length > 1 ? 'Jumelages : ' : 'Jumelage : ') + liste.length : 'Pas de jumelage en cours'; montrer(titre); montrerParents(titre); }
+    catch (e) { console.error('[LPC][AdminOrganisme] titre des jumelages KO :', e); }
+  }
+  if (!tab) { if (liste.length) console.warn('[LPC][AdminOrganisme] #OrgtableJumelage introuvable : jumelages non affichés'); return; }
+  if (!liste.length) { cacher(tab); return; }
+  try {
+    try { tab.columns = COLONNES_JUM.map((c) => Object.assign({}, c)); }
+    catch (e) { console.warn('[LPC][AdminOrganisme] colonnes de #OrgtableJumelage non posées (' + (e && e.message) + ')'); }
+    try { if (tab.customClassList) tab.customClassList.add('lpc-table-jumelage'); } catch (e) { /* classe sans effet : style du tableau dans l'éditeur */ }
+    tab.rows = liste.map((x, i) => ({ _id: 'j' + (i + 1), resident: x.resident || '', chambre: x.chambre || '', porteur: x.porteur || '' }));
+    montrer(tab); montrerParents(tab);
+  } catch (e) { console.error('[LPC][AdminOrganisme] tableau des jumelages KO :', e); }
 }
 
 // ─── préremplissage ──────────────────────────────────────────────────────

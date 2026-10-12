@@ -1,5 +1,5 @@
 // Code de PAGE « Back-office » (/admin) — listes filtrables Membres / Organismes / Résidents + export.
-// version du code : 2026-10-12-a   (12/10 a : #CompteurCartes « nombre de cartes : N » sur l'onglet Membres ; 10/10 b : bouton « Créer un membre » visible sur les trois onglets)
+// version du code : 2026-10-12-b   (12/10 b : garde sur les cellules absentes du modèle ; 12/10 a : #CompteurCartes « nombre de cartes : N » sur l'onglet Membres ; 10/10 b : bouton « Créer un membre » visible sur les trois onglets)
 //   (anciennement 2026-10-10-a   (10/10 a : onglet Membres : fiche dont l'e-mail Wix n'est pas vérifié = 2e bouton facultatif #btnEnvoyerLien « Envoyer le lien » à côté de « Modifier »)
 //   (anciennement 2026-10-07-c   (07/10 c : « Non validé » + bouton « Valider » ; 07/10 : troncature à 60 caractères des textes libres ; bouton #btnCreerMembre ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes »)
 //
@@ -27,7 +27,7 @@ import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
 import { adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
 
-const VERSION = '2026-10-12-a';   // 12/10 : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-12-b';   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -188,7 +188,8 @@ function remplirItem($item, d) {
   const cols = COLONNES[onglet];
   for (let i = 0; i < NB_CELLULES; i++) {
     const cell = $item('#c' + (i + 1));
-    if (!cell) continue;
+    // 12/10 : un ID absent du modèle de ligne renvoie un objet SANS méthodes (« i.hide is not a function » sur #c10) : cellule ignorée
+    if (!cell || typeof cell.hide !== 'function') continue;
     safe('cellule c' + (i + 1), () => {
       const c = cols[i];
       if (!c) { cell.text = ''; cell.hide(); return; }
@@ -426,6 +427,7 @@ async function charger(nouvelOnglet) {
     const nbJum = (res.totaux && res.totaux.jumelages) || 0;
     setTxt(idTotaux(), `${res.lignes.length} ${res.lignes.length > 1 ? plusieurs : un} et ${nbJum} jumelage${nbJum > 1 ? 's' : ''}`);
     // 12/10 : cartes promises (somme des « nombre de cartes » des porteurs de la liste), onglet Membres seulement
+    if (!el('#CompteurCartes')) console.warn('[LPC][Admin] #CompteurCartes introuvable sur la page : à créer dans l’éditeur (texte, ID « CompteurCartes »)');
     setTxt('#CompteurCartes', onglet === 'membres' ? 'nombre de cartes : ' + ((res.totaux && res.totaux.cartes) || 0) : '');
     setTxt('#messageErreur', '');
     return true;

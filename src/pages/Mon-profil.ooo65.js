@@ -104,14 +104,14 @@ let champNb;
 let minuterieAide = null;
 
 $w.onReady(async () => {
-  console.log('[LPC][Profil] version du code : 2026-10-12-a (titre « Mon profil » toujours visible ; formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
+  console.log('[LPC][Profil] version du code : 2026-10-12-b (titre #TitreMonProfil toujours visible : seule la pile #BoxNav2 est masquée ; formulaire générique, mode profil ; traces photo ; bouton organisation ; jumelages du porteur)');
   safe('masquage erreur', hideErr);
   safe('contrôle des ID', checkIds);
   safe('onglet actif', () => marquerOnglet(EL_ONGLETS.ongletProfil, EL_ONGLETS.ongletOrganisme));
   // Onglets, consentement RGPD, champ « nombre de cartes » masqués d'emblée, avant tout appel serveur
   safe('masquage initial', () => {
-    // 12/10 : la boîte et la pile d'onglets restent visibles (le titre « Mon profil » y est) ; seuls les onglets Organisme et Résidents sont masqués d'emblée
-    cacher(optionnel(EL_ONGLETS.ongletOrganisme)); cacher(boutonResidents());
+    // 12/10 : #BoxOnglets reste visible (#TitreMonProfil y est) ; seule la pile des onglets (#BoxNav2) est masquée d'emblée
+    cacher(pileOnglets()); cacher(boutonResidents());
     cacher(optionnel(EL.consentement));
     cacher(premier(BOX_ADMIN));          // box des jumelages : réaffichée par afficherJumelages() pour un porteur jumelé
     IDS_GLOBAL_A_REPLIER.forEach((id) => cacher(optionnel(id)));
@@ -130,7 +130,7 @@ $w.onReady(async () => {
   }
 
   if (!d.existe) {
-    safe('masquage des onglets', () => { cacher(pileOnglets()); cacher(boiteOnglets()); });
+    safe('masquage des onglets', () => { cacher(pileOnglets()); });
     safe('bouton désactivé', () => { const b = optionnel(EL.bouton); if (b && b.disable) b.disable(); });
     showErr("Votre fiche n'existe pas encore. Merci de remplir d'abord un formulaire de participation.");
     return;
@@ -152,14 +152,18 @@ function ongletsVisibles(profil, organisation) {
   const aUneOrganisation = Boolean(organisation);
   // 08/10 : un Accueillant ou un Partenaire voit l'onglet Organisme même SANS organisation (il peut en créer une) ; Résidents : organisation requise
   const afficher = aUneOrganisation || aUnStatut;
-  // 12/10 : la boîte et la pile restent TOUJOURS visibles : le titre « Mon profil » s'y trouve et disparaissait pour un simple porteur.
-  // Seul l'onglet Organisme suit la règle d'affichage.
+  // 12/10 (Bruno) : #TitreMonProfil est dans #BoxOnglets : la boîte reste TOUJOURS visible ; seule la pile des onglets #BoxNav2 suit la règle.
   const boite = boiteOnglets();
   const pile = pileOnglets();
-  [pile, boite].forEach((el) => { if (el) montrer(el); });
-  if (!boite && !pile) console.warn("[LPC][Profil] boîte d'onglets introuvable (" + BOITE_ONGLETS.join(', ') + ')');
-  const ongletOrg = optionnel(EL_ONGLETS.ongletOrganisme);
-  if (afficher) montrer(ongletOrg); else cacher(ongletOrg);
+  if (boite) { montrer(boite); montrerParents(boite); }
+  const titreProfil = optionnel('#TitreMonProfil');
+  if (titreProfil) { montrer(titreProfil); montrerParents(titreProfil); }
+  if (pile) { if (afficher) montrer(pile); else cacher(pile); }
+  else {
+    console.warn("[LPC][Profil] pile d'onglets introuvable (" + PILE_ONGLETS.join(', ') + ') : repli sur le seul onglet Organisme');
+    const ongletOrg = optionnel(EL_ONGLETS.ongletOrganisme);
+    if (afficher) montrer(ongletOrg); else cacher(ongletOrg);
+  }
   const ongletRes = boutonResidents();
   if (ongletRes) {
     peindre(ongletRes, ONGLET_INACTIF);

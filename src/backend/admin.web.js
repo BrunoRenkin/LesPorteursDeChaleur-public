@@ -59,7 +59,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
  */
 
-const VERSION = '2026-10-12-a';
+const VERSION = '2026-10-12-b';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -911,12 +911,29 @@ export const adminOrganismeCourant = webMethod(Permissions.SiteMember, async () 
     residents = statsResidents(org._id, rs, j.parResident);
   } catch (e) { /* titre sans chiffres plutôt qu'une page en erreur */ }
 
+  // 12/10 : jumelages en cours des résidents ACTIFS de l'organisme (une ligne par jumelage : résident, chambre, porteur) : tableau #OrgtableJumelage
+  let jumelagesOrg = [];
+  try {
+    const rs = (await residentsDeOrg(org._id)).filter((r) => r.actif !== false);
+    const parId = new Map(rs.map((r) => [r._id, r]));
+    const jums = (await wixData.query('Jumelages').hasSome('statut', ['propose', 'actif']).limit(LIMITE).find({ suppressAuth: true })).items
+      .filter((j) => idsOf(j.resident).some((id) => parId.has(id)));
+    const pids = [...new Set(jums.flatMap((j) => idsOf(j.porteur)))];
+    const noms = new Map();
+    if (pids.length) (await wixData.query('Membres').hasSome('_id', pids).limit(LIMITE).find({ suppressAuth: true })).items.forEach((m) => noms.set(m._id, nomAffiche(m)));
+    jumelagesOrg = jums.map((j) => {
+      const r = parId.get(idsOf(j.resident).find((id) => parId.has(id)));
+      return { resident: nomResident(r), chambre: r.numero_chambre || '', porteur: noms.get(idsOf(j.porteur)[0]) || '(porteur inconnu)' };
+    }).sort((a, b) => a.resident.localeCompare(b.resident, 'fr') || a.porteur.localeCompare(b.porteur, 'fr'));
+  } catch (e) { jumelagesOrg = []; }
+
   await journaliser(admin, 'lire-fiche:organismes', org._id, '');
   return {
     ok: true,
     version: VERSION,
     ticket: t._id,
     expire: t.expire,
+    jumelages: { liste: jumelagesOrg },   // aucune donnée de santé
     organisation: {
       nom: org.nom || '',
       localite: org.localite || '',
