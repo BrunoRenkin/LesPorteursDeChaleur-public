@@ -1,6 +1,6 @@
 // Code de PAGE « Adminresidents » (/adminresidents) : un administrateur gère les RÉSIDENTS d'un organisme.
 // Page construite sur le modèle de « Mes résidents » (page-mes-residents.js) + la section globale Navigation de l'admin.
-// version du code : 2026-10-06-h   (06/10 : cases indicateur A / indicateur B retirées, champ texte #infosimportantes ; #btnAjouter à trois états comme « Mes résidents »)
+// version du code : 2026-10-06-h   (06/10 : anciennes cases de santé retirées, champ texte #infosimportantes ; #btnAjouter à trois états comme « Mes résidents »)
 //
 // L'organisme visé n'apparaît JAMAIS dans l'URL : l'entrée (bouton « Modifier » de l'onglet Résidents de /admin, ou bouton « Résidents »
 // de /adminorganisme) crée un ticket serveur « gestion-residents » (backend/admin.web.js, collection Tickets_Admin). Toute la sécurité
@@ -21,7 +21,7 @@ import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import { adminResidentsCourants, adminEnregistrerResidents, adminOuvrirOrganismeDepuisResidents } from 'backend/admin.web';
 
-const VERSION = '2026-10-12-a';   // 12/10 : #btnSupprimer masqué pour un résident jumelé (demande de Bruno après le tour du site avec l’équipe)
+const VERSION = '2026-10-12-a';   // 12/10 : #btnSupprimer masqué pour un résident jumelé (demande de Bruno)
 const PAGE_ORGANISME = '/adminorganisme';
 const PAGE_LISTE = '/admin?onglet=residents';
 // Retour après enregistrement (04/10) : la page d'où l'on vient, transmise par ?depuis=… (aucun identifiant ; le ticket de l'autre page reste

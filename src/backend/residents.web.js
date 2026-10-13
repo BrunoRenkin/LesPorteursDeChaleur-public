@@ -17,8 +17,7 @@ import { currentMember } from 'wix-members-backend';
  *   - aucune suppression : un résident qui ne reçoit plus de cartes passe `actif = false`
  *     (les Jumelages le référencent)
  *   - `nom` ne contient que l'INITIALE (2 caractères max) ; `prenom` est requis
- *   - `infosimportantes` (texte libre, 06/10, remplace les cases indicateur_a / indicateur_b, qui ne sont plus écrites
- *     mais restent en base) : peut contenir des données de santé, lu et écrit ici pour l'institution qui l'a saisi, jamais
+ *   - `infosimportantes` (texte libre, 06/10, remplace d'anciennes cases de santé, supprimées) : peut contenir des données de santé, lu et écrit ici pour l'institution qui l'a saisi, jamais
  *     renvoyé à un Porteur. Aucune autre web method ne doit l'exposer à un Porteur
  *   - l'accord (`accordResidents`) est exigé à chaque enregistrement ; il est tracé dans
  *     `Residents.consentement_rgpd` sur chaque ligne enregistrée ; getMesResidents renvoie

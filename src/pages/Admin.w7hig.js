@@ -1,7 +1,7 @@
 // Code de PAGE « Back-office » (/admin) — listes filtrables Membres / Organismes / Résidents + export.
 // version du code : 2026-10-12-c   (12/10 c : totaux du site dans #TotauxMembresetJumelage ; 12/10 b : garde sur les cellules absentes du modèle ; 12/10 a : #CompteurCartes « nombre de cartes : N » sur l'onglet Membres ; 10/10 b : bouton « Créer un membre » visible sur les trois onglets)
 //   (anciennement 2026-10-10-a   (10/10 a : onglet Membres : fiche dont l'e-mail Wix n'est pas vérifié = 2e bouton facultatif #btnEnvoyerLien « Envoyer le lien » à côté de « Modifier »)
-//   (anciennement 2026-10-07-c   (07/10 c : « Non validé » + bouton « Valider » ; 07/10 : troncature à 60 caractères des textes libres ; bouton #btnCreerMembre ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes »)
+//   (anciennement 2026-10-07-c   (07/10 c : « Non validé » + bouton « Valider » ; 07/10 : troncature à 60 caractères des textes libres ; bouton #btnCreerMembre ; 06/10 : anciennes colonnes de santé remplacées par « Infos importantes »)
 //
 // Page « Membres uniquement », hors menu, non indexée. Ce réglage n'est qu'un confort : le contrôle
 // réel est dans le backend (backend/admin.web.js → backend/lpc-acces.js). Un membre non admin ne

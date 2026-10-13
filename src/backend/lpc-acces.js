@@ -10,7 +10,7 @@ import { currentMember } from 'wix-members-backend';
  *  exigerAdmin() AVANT toute lecture ou écriture.
  *
  *  Cascade (Bruno, 29/09) :
- *   1. rôle « Admin » renvoyé par Wix (propriétaire reconnu) → l’équipe passe ici
+ *   1. rôle « Admin » renvoyé par Wix (propriétaire reconnu) → le propriétaire passe ici
  *   2. sinon, rôle membre dédié « admin LPC », reconnu par son ID (le nom est modifiable),
  *      attribué dans le tableau de bord Wix aux personnes autorisées
  *  Plus de liste d'ID de membres (supprimée le 29/09, décision de Bruno). Les co-propriétaires ne sont

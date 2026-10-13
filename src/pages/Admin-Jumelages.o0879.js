@@ -1,5 +1,5 @@
 // Code de PAGE « Adminjumelage » (/adminjumelages) : jumelage MANUEL porteur <-> résident, par un administrateur.
-// version du code : 2026-10-12-c   (12/10 c : montrerParents défini ; 12/10 b : totaux du site dans #TotauxMembresetJumelage (mode tous) ; 12/10 : bouton Jumelage de la navigation fonctionne depuis la liste d'un porteur ; 07/10 : « Centres d'intérêt » et « Infos importantes » tronqués à 60 caractères à l'affichage ; 06/10 : colonnes indicateur A / indicateur B remplacées par « Infos importantes » ; ordre Centres d'intérêt, Infos importantes ;
+// version du code : 2026-10-12-c   (12/10 c : montrerParents défini ; 12/10 b : totaux du site dans #TotauxMembresetJumelage (mode tous) ; 12/10 : bouton Jumelage de la navigation fonctionne depuis la liste d'un porteur ; 07/10 : « Centres d'intérêt » et « Infos importantes » tronqués à 60 caractères à l'affichage ; 06/10 : anciennes colonnes de santé remplacées par « Infos importantes » ; ordre Centres d'intérêt, Infos importantes ;
 //   #c8 masqué ; Résident -> lien vers /adminresidents, Institution -> lien vers /adminorganisme)
 //
 // Page « Membres uniquement » : le contrôle réel est dans le backend (backend/admin.web.js -> backend/lpc-acces.js). Aucune

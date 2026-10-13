@@ -4,6 +4,7 @@ import { members, authorization, authentication } from 'wix-members-backend';
 import { members as membersV2 } from 'wix-members.v2';
 import { contacts } from 'wix-crm-backend';
 import { elevate } from 'wix-auth';
+import { getSecret } from 'wix-secrets-backend';
 import { exigerAdmin, journaliser, estAdminSilencieux } from 'backend/lpc-acces';
 
 const updateMember = elevate(members.updateMember);   // « Manage Members »
@@ -17,8 +18,8 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *  version du code : 2026-10-07-b
  *    (07/10 b : comptes Wix SANS fiche LPC listés dans l'onglet Membres (statut « Non validé », filtre) ; adminValiderMembreWix = « Valider » : crée la fiche liée au compte Wix)
  *    (07/10 : adminCreationOptions + adminCreerMembre = création d'un membre par l'admin : compte Wix sans mot de passe, fiche Membres, statut choisi, consentement RGPD confirmé par l'admin)
- *    (06/10 suite : champ CMS `infosimportantes` ; listes /admin et /adminjumelages : colonnes indicateur A / indicateur B remplacées par « Infos importantes », filtres retirés)
- *    (06/10 : résidents = champ texte `infosimportantes` à la place des cases indicateur_a / indicateur_b, qui ne sont plus écrites)
+ *    (06/10 suite : champ CMS `infosimportantes` ; listes /admin et /adminjumelages : anciennes colonnes de santé remplacées par « Infos importantes », filtres retirés)
+ *    (06/10 : résidents = champ texte `infosimportantes` à la place des anciennes cases de santé)
  *    (03/10 : adminEnregistrerMembre gère la PHOTO : ajout, remplacement, retrait, avec vérification du compte Wix)
  *    adminEmailPorteurCourant({ ticket })        page /adminprofil (04/10) : même e-mail, porteur = celui du ticket « membres » (aucun identifiant côté page)
  *    adminEmailPorteur({ resident | porteur })   page /adminjumelages (bouton de LIGNE, 04/10) : e-mail de jumelage d'un porteur dont le quota est rempli (brouillon, rien n'est envoyé), JOURNALISÉ
@@ -56,10 +57,10 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *     (Permissions.Admin est inutilisable : Wix n'y reconnaît pas les co-propriétaires.)
  *   - suppressAuth seulement APRÈS exigerAdmin().
  *   - Paramètres du navigateur jamais crus : onglet sur liste fermée, textes tronqués.
- *   - Données minimales : `Residents.indicateur_a` n'est JAMAIS renvoyé par les listes.
+ *   - Données minimales : `infosimportantes` n'est JAMAIS renvoyé à un porteur.
  */
 
-const VERSION = '2026-10-12-g';
+const VERSION = '2026-10-13-a';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -637,7 +638,7 @@ export const adminEnregistrerMembre = webMethod(Permissions.SiteMember, async (p
 // Compte Wix créé SANS mot de passe (createMember : aucun e-mail envoyé, loginEmailVerified = false) puis fiche `Membres`
 // créée tout de suite (members-sync ne la crée qu'à la première connexion du membre, et assignerait le rôle à ce moment).
 // La personne prend la main sur son compte par « mot de passe oublié ». Aucun ticket : la page /adminprofil?mode=creation
-// n'a pas de fiche visée. Le consentement RGPD est recueilli HORS du site par l'admin (oral ou e-mail de l’équipe) : la case
+// n'a pas de fiche visée. Le consentement RGPD est recueilli HORS du site par l'admin (oral ou par e-mail) : la case
 // #checkbox2 doit être cochée par l'admin, le serveur l'exige et le journal le mentionne.
 
 const STATUTS_CREATION = ['Porteur', 'Accueillant', 'Partenaire'];
@@ -763,7 +764,7 @@ export const adminCreerMembre = webMethod(Permissions.SiteMember, async (payload
       email, prenom, nom, telephone,
       localite: clean(payload.localite, 120),
       commentaire: clean(payload.commentaire, 2000),
-      consentement_rgpd: true,            // créer la personne vaut consentement (Bruno, 09/10) ; un retrait ultérieur reste à traiter (cas non prévu)
+      consentement_rgpd: true,            // consentement recueilli hors site avant la création
       consentement_photo: Boolean(photoUrl) && payload.consentementPhoto === true,
       photo: photoUrl || '',
       abonnement_newsletter: false,
@@ -1161,7 +1162,7 @@ export const adminEnregistrerOrganisme = webMethod(Permissions.SiteMember, async
 // Règles (Bruno, 02/10) : UN SEUL porteur par résident ; « Jumeler » crée un jumelage `actif` ; « Annuler » met `annule`
 // (ligne gardée, ne compte ni dans les places ni dans « jumelé ») ; places d'un porteur = nbResidentsMax - jumelages
 // `propose`/`actif`. Toute la décision (qui peut être jumelé, quelles actions) est calculée ICI, jamais crue du navigateur.
-// `indicateur_a` / `indicateur_b` sont visibles de l'équipe admin, jamais envoyés à un porteur.
+// `infosimportantes` est visible de l'équipe admin, jamais envoyé à un porteur.
 
 const parseCible = (c) => {
   const s = String(c || '');
@@ -1371,9 +1372,9 @@ export const adminAnnulerJumelage = webMethod(Permissions.SiteMember, async (p =
 // site (envoi à des tiers payant, décision du 22/09) et l'administrateur relit avant d'envoyer.
 // Disponible seulement quand le QUOTA du porteur est REMPLI (jumelages proposés ou actifs >= nbResidentsMax), recontrôlé ici.
 // Contenu : pour chaque résident jumelé, prénom + initiale, établissement (+ adresse, à défaut localité), centres d'intérêt. JAMAIS les données de santé
-// (indicateur_a, indicateur_b) ni infosimportantes : un porteur ne les reçoit pas. Le numéro de chambre est repris depuis le 12/10 (demande de Bruno).
+// ni infosimportantes : un porteur ne le reçoit pas. Le numéro de chambre est repris depuis le 12/10 (demande de Bruno).
 // Texte destiné à un tiers : pas de tiret cadratin, pas de point final sur les puces (règles de rédaction externe).
-// TEXTE DE BRUNO (04/10), tutoiement, variantes SINGULIER / PLURIEL selon le nombre de résidents jumelés. Rédigé à la voix de l’équipe (signature, adresse de dépôt).
+// TEXTE DE BRUNO (04/10), tutoiement, variantes SINGULIER / PLURIEL selon le nombre de résidents jumelés. Rédigé à la première personne, signature collective ; l'adresse de dépôt vient du gestionnaire de secrets (jamais dans le code).
 // Règles de rédaction externe : pas de tiret cadratin, pas de point final sur les puces.
 const REPERES_EMAIL = (n) => [
   "Une carte écrite à la main, quelques lignes sincères suffisent",
@@ -1381,7 +1382,12 @@ const REPERES_EMAIL = (n) => [
   "Garde un ton chaleureux et positif, l'important reste vraiment le geste, la chaleur et l'attention que tu y mettras",
   "Si tu le souhaites, tu peux glisser dans l'enveloppe un petit papier avec ton adresse postale. Cela permettra éventuellement à un résident de te répondre s'il le souhaite mais je ne peux évidemment rien garantir mais certaines maisons de repos trouvent cette idée très belle. Cela reste totalement facultatif",
 ];
-const ADRESSE_DEPOT = '[adresse de dépôt retirée]';
+const SECRET_ADRESSE_DEPOT = 'LPC_ADRESSE_DEPOT';   // nom du secret (Wix > Outils de développement > Gestionnaire de secrets)
+const ADRESSE_A_COMPLETER = '[adresse de dépôt à compléter]';
+async function adresseDepot() {
+  try { const a = await getSecret(SECRET_ADRESSE_DEPOT); return a ? String(a).trim() : ADRESSE_A_COMPLETER; }
+  catch (e) { return ADRESSE_A_COMPLETER; }
+}
 const OBJET_EMAIL = (campagne, n) => 'Les Porteurs de Chaleur : ' + (n > 1 ? 'tes résidents' : 'ton résident') + (campagne ? ' pour ' + campagne : '');
 
 export const adminEmailPorteur = webMethod(Permissions.SiteMember, async (params = {}) => {
@@ -1461,9 +1467,10 @@ async function composerEmailPorteur(admin, porteurId) {
   lignes.push(plur ? 'Quelques repères pour tes cartes :' : 'Quelques repères pour ta carte :');
   REPERES_EMAIL(n).forEach((p) => lignes.push('- ' + p));
   lignes.push('');
+  const adresse = await adresseDepot();
   lignes.push(plur
-    ? 'Une fois les cartes rédigées, pourrais-tu les déposer chez moi, ' + ADRESSE_DEPOT + '.'
-    : 'Une fois la carte rédigée, pourrais-tu la déposer chez moi, ' + ADRESSE_DEPOT + '.');
+    ? 'Une fois les cartes rédigées, pourrais-tu les déposer à l\'adresse suivante : ' + adresse + '.'
+    : 'Une fois la carte rédigée, pourrais-tu la déposer à l\'adresse suivante : ' + adresse + '.');
   lignes.push(plur
     ? 'De même, pourrais-tu me confirmer par retour de courrier que tu as bien reçu ce mail et que tu es toujours disponible pour rédiger ces cartes.'
     : 'De même, pourrais-tu me confirmer par retour de courrier que tu as bien reçu ce mail et que tu es toujours disponible pour rédiger cette carte.');
@@ -1520,7 +1527,7 @@ export const adminOuvrirResidents = webMethod(Permissions.SiteMember, async (par
 //     (jumelage en cours, proposé ou actif) : refusé ici, le bouton est aussi masqué par la page
 //   - l'accord RGPD (`consentement_rgpd`) n'est pas un acte de l'admin : conservé sur un résident modifié ; un résident créé reçoit la
 //     valeur déjà donnée pour cet organisme (vrai si un de ses résidents la porte), sinon faux
-//   - données de santé (indicateur_a, indicateur_b) : visibles de l'équipe admin, jamais envoyées à un porteur
+//   - infosimportantes (peut contenir des données de santé) : visible de l'équipe admin, jamais envoyé à un porteur
 const ENTITE_RES = 'gestion-residents';
 const MAX_RESIDENTS = 200;
 const initiale = (s) => clean(String(s || '').replace(/[.]/g, ''), 2).toUpperCase();

@@ -7,7 +7,7 @@
 // Pages « Membres uniquement », hors menu.
 //
 // Mise en page (Bruno, 26/09) : UN SEUL répéteur. Chaque ligne porte Prénom, Nom (initiale),
-// Chambre, indicateur A, Intérêts et un bouton « Ajouter ».
+// Chambre, Infos importantes, Intérêts et un bouton « Ajouter ».
 //   - les résidents déjà enregistrés occupent les premières lignes, modifiables ;
 //   - la DERNIÈRE ligne est vide : c'est la seule où « Ajouter » est visible ;
 //   - Ajouter enregistre toute la liste (dont la dernière ligne) et ajoute une nouvelle ligne vide ;

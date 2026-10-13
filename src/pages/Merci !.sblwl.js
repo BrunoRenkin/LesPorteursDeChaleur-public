@@ -12,7 +12,7 @@ import wixLocation from 'wix-location';
 const MISE_A_JOUR = 'Merci. Vos informations ont bien été mises à jour.';
 
 const TEXTES = {
-  porteur: 'Merci. Vous êtes désormais Porteur de chaleur. Votre envie de donner un peu de votre temps vient de rejoindre le mouvement. l’équipe reviendra vers vous très vite pour transformer cette envie en geste concret.',
+  porteur: 'Merci. Vous êtes désormais Porteur de chaleur. Votre envie de donner un peu de votre temps vient de rejoindre le mouvement. Nous reviendrons vers vous très vite pour transformer cette envie en geste concret.',
   accueillant: "Merci pour votre confiance. Nous reviendrons vers vous prochainement afin d'imaginer ensemble comment un Porteur de chaleur pourrait venir à votre rencontre.",
   'porteur-mon-profil': MISE_A_JOUR,
   'porteur-mon-organisation': MISE_A_JOUR,
@@ -44,7 +44,7 @@ function trouverTexte() {
 }
 
 $w.onReady(() => {
-  console.log('[LPC][Merci] version du code : 2026-09-26-d');
+  console.log('[LPC][Merci] version du code : 2026-10-13-a');
   const f = String(wixLocation.query.f || '').toLowerCase();
   console.log('[LPC][Merci] URL reçue :', wixLocation.url);
   const texte = TEXTES[f];

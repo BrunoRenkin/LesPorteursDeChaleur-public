@@ -275,7 +275,7 @@ export const submitPartenaire = webMethod(Permissions.SiteMember, async (payload
   await wixData.replaceReferences(COL_ORGS, 'types', orgId, typesFinal, { suppressAuth: true });
   await wixData.replaceReferences(COL_ORGS, 'capacites', orgId, capsFinal, { suppressAuth: true });
 
-  // Homonyme possible (même nom + même adresse) : signalé à l’équipe, pas de fusion auto
+  // Homonyme possible (même nom + même adresse) : signalé à l'équipe, pas de fusion auto
   let homonyme = false;
   try {
     const cands = (await wixData.query(COL_ORGS).contains('nom', organisme).ne('_id', orgId)
