@@ -27,7 +27,7 @@ import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
 import { adminTotaux, adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse, adminEmailPorteur } from 'backend/admin.web';
 
-const VERSION = '2026-10-13-a';   // 13/10 : « Mail au porteur » (#c9) sur l'onglet Membres, porteurs au quota rempli ;      // 12/10 (e) : onglet Organismes : colonne Adresse (c4 / h4) à la place de Localité ;   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-13-b';   // 13/10 : « Mail au porteur » (#c9) sur l'onglet Membres, porteurs au quota rempli ;      // 12/10 (e) : onglet Organismes : colonne Adresse (c4 / h4) à la place de Localité ;   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets', 'adresse'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -247,7 +247,7 @@ function remplirItem($item, d) {
     c.text = 'Mail au porteur';
     retirer();
     try { if (classes && classes.add) { classes.add('lpc-bouton'); classes.add('lpc-bouton-plein'); } } catch (e) { /* ignoré */ }
-    c.onClick(() => { if (onglet === 'membres' && d.emailPossible === true) envoyerEmailPorteur(c, d); });
+    c.onClick(() => { if (onglet === 'membres' && d.emailPossible === true && d.lienPret !== true) envoyerEmailPorteur(c, d); });
     c.show();
   });
 }
@@ -498,6 +498,10 @@ async function valider(ligne) {
 /** « Envoyer le lien » (compte Wix à e-mail non vérifié) : Wix envoie à la personne l'e-mail de définition du mot de passe, qui vérifie l'e-mail. */
 const GMAIL_COMPTE = 'lesporteursdechaleur@gmail.com';   // même compte que /adminjumelages (décision du 04/10 : envoi depuis Gmail)
 const LONGUEUR_MAX_URL = 6000;
+// 13/10 (demande de Bruno) : Gmail dans un NOUVEL onglet. `wixLocation.to` n'a pas de cible et le navigateur bloque une ouverture lancée après un appel
+// serveur : on écrit donc un vrai lien <a target="_blank"> dans le HTML de #c9 (voie qui fonctionne pour les mailto, 30/09) ; un second clic l'ouvre.
+// Mettre false pour revenir à l'ouverture dans le même onglet (⚠️ `target` dans .html non vérifié : Wix peut le retirer).
+const NOUVEL_ONGLET = true;
 let emailEnCours = false;
 /** « Mail au porteur » d'une ligne de l'onglet Membres : fenêtre de rédaction Gmail (même onglet), RIEN n'est envoyé par le site. */
 async function envoyerEmailPorteur(cellule, ligne) {
@@ -527,6 +531,14 @@ async function envoyerEmailPorteur(cellule, ligne) {
           note += 'Le texte du message a aussi été copié dans le presse-papiers. ';
         }
       } catch (e) { console.warn('[LPC][Admin] copie dans le presse-papiers KO :', e && e.message); }
+    }
+    if (NOUVEL_ONGLET && cellule) {
+      try {
+        cellule.html = '<p class="' + CLASSE_TEXTE + '"><a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">Ouvrir le brouillon (nouvel onglet)</a></p>';
+        ligne.lienPret = true;   // le second clic ouvre le lien : le gestionnaire ne recompose pas le brouillon
+        setTxt('#messageErreur', (note + 'Brouillon prêt : cliquez sur « Ouvrir le brouillon » (nouvel onglet).').trim(), note ? '#B9770E' : '#1E8449');
+        return;
+      } catch (e) { console.warn('[LPC][Admin] lien nouvel onglet KO, repli même onglet :', e && e.message); }
     }
     if (note) setTxt('#messageErreur', note.trim(), '#B9770E');
     wixLocation.to(url);
