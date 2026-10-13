@@ -27,7 +27,7 @@ import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
 import { adminTotaux, adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse, adminEmailPorteur } from 'backend/admin.web';
 
-const VERSION = '2026-10-13-b';   // 13/10 : « Mail au porteur » (#c9) sur l'onglet Membres, porteurs au quota rempli ;      // 12/10 (e) : onglet Organismes : colonne Adresse (c4 / h4) à la place de Localité ;   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-13-c';   // 13/10 : « Mail au porteur » (#c9) sur l'onglet Membres, porteurs au quota rempli ;      // 12/10 (e) : onglet Organismes : colonne Adresse (c4 / h4) à la place de Localité ;   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets', 'adresse'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -534,7 +534,7 @@ async function envoyerEmailPorteur(cellule, ligne) {
     }
     if (NOUVEL_ONGLET && cellule) {
       try {
-        cellule.html = '<p class="' + CLASSE_TEXTE + '"><a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">Ouvrir le brouillon (nouvel onglet)</a></p>';
+        cellule.html = '<p class="' + CLASSE_TEXTE + '"><a href="' + esc(url) + '" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none">Ouvrir le brouillon</a></p>';
         ligne.lienPret = true;   // le second clic ouvre le lien : le gestionnaire ne recompose pas le brouillon
         setTxt('#messageErreur', (note + 'Brouillon prêt : cliquez sur « Ouvrir le brouillon » (nouvel onglet).').trim(), note ? '#B9770E' : '#1E8449');
         return;
