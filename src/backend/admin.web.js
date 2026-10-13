@@ -60,7 +60,7 @@ const queryMembersWix = elevate(membersV2.queryMembers);   // comptes Wix sans f
  *   - Données minimales : `infosimportantes` n'est JAMAIS renvoyé à un porteur.
  */
 
-const VERSION = '2026-10-13-a';
+const VERSION = '2026-10-13-b';
 const CAMPAGNE = 'Noël 2026';   // valeur de Jumelages.campagne pour les jumelages créés maintenant (⚠️ à confirmer par Bruno)
 const COL_TICKETS = 'Tickets_Admin';
 const DUREE_TICKET_MS = 2 * 60 * 60 * 1000;
@@ -197,6 +197,7 @@ async function lignesMembres() {
       ...dates(m),
       _jum: encours,
       emailNonVerifie,
+      emailPossible: Boolean(cartes && max >= 1 && encours >= max && m.email),   // 13/10 : « Mail au porteur » de la liste Membres (quota rempli) ; recontrôlé par le serveur au clic
       filtres: [...statuts, cartes ? 'Écrit des cartes' : '', cartes && encours < max ? 'Non jumelés' : '', emailNonVerifie ? LIB_NON_VERIFIE : ''].filter(Boolean),
     };
   });
@@ -285,7 +286,7 @@ async function lignesFiltrees(params = {}) {
   const gardees = lignes.filter((l) => {
     if (filtre !== TOUS && !l.filtres.some((f) => sansAccents(f) === filtre)) return false;
     if (!q) return true;
-    const meule = sansAccents(Object.entries(l).filter(([k]) => k !== '_id' && k !== '_jum' && k !== 'filtres' && k !== 'cree' && k !== 'modifie' && k !== 'nonValide' && k !== 'emailNonVerifie').map(([, v]) => v).join(' '));
+    const meule = sansAccents(Object.entries(l).filter(([k]) => k !== '_id' && k !== '_jum' && k !== 'filtres' && k !== 'cree' && k !== 'modifie' && k !== 'nonValide' && k !== 'emailNonVerifie' && k !== 'emailPossible').map(([, v]) => v).join(' '));
     return q.split(/\s+/).every((mot) => meule.includes(mot));
   });
   gardees.sort((a, b) => a.nom.localeCompare(b.nom, 'fr'));
@@ -320,7 +321,7 @@ export const adminExport = webMethod(Permissions.SiteMember, async (params = {})
   let admin;
   try { admin = await exigerAdmin('export'); } catch (e) { if (estRefus(e)) return REFUSE; throw e; }
   const { onglet, lignes } = await lignesFiltrees(params);
-  const cles = lignes.length ? Object.keys(lignes[0]).filter((k) => k !== '_id' && k !== 'nonValide' && k !== 'emailNonVerifie') : [];
+  const cles = lignes.length ? Object.keys(lignes[0]).filter((k) => k !== '_id' && k !== 'nonValide' && k !== 'emailNonVerifie' && k !== 'emailPossible') : [];
   const csv = [cles.map(csvCell).join(';'), ...lignes.map((l) => cles.map((k) => csvCell(l[k])).join(';'))].join('\n');
   const emails = onglet === 'membres' ? lignes.map((l) => l.email).filter(Boolean).join('; ') : '';
   // Un export = une extraction de données personnelles : toujours tracé.

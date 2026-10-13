@@ -25,9 +25,9 @@
 import { authentication } from 'wix-members-frontend';
 import wixLocation from 'wix-location';
 import wixWindowFrontend from 'wix-window-frontend';
-import { adminTotaux, adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse } from 'backend/admin.web';
+import { adminTotaux, adminListe, adminExport, adminOuvrirFiche, adminOuvrirOrganismeDuResident, adminOuvrirJumelageDuResident, adminOuvrirDepuisOrganisme, adminOuvrirOrganismeDepuisListeMembres, adminValiderMembreWix, adminEnvoyerLienMotDePasse, adminEmailPorteur } from 'backend/admin.web';
 
-const VERSION = '2026-10-12-e';   // 12/10 (e) : onglet Organismes : colonne Adresse (c4 / h4) à la place de Localité ;   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
+const VERSION = '2026-10-13-a';   // 13/10 : « Mail au porteur » (#c9) sur l'onglet Membres, porteurs au quota rempli ;      // 12/10 (e) : onglet Organismes : colonne Adresse (c4 / h4) à la place de Localité ;   // 12/10 (c) : totaux du site « xx membres, yy cartes, zz résidents et ww jumelages » ; « Nombre de cartes » avec majuscule ;   // 12/10 (b) : garde sur #c10 absent ; (a) : #CompteurCartes (cartes promises) ;   // 07/10 (c) : lignes « Non validé » (comptes Wix sans fiche) et bouton « Valider » ; (b) : « Infos importantes » et « Intérêts » tronqués à 60 caractères ; (a) : bouton #btnCreerMembre -> /adminprofil?mode=creation
 const TEXTE_LIBRE = ['infosimportantes', 'interets', 'adresse'];
 const LONGUEUR_MAX_CELLULE = 60;
 const PAGE_CREATION_MEMBRE = '/adminprofil?mode=creation';   // 06/10 (b) : onglet Résidents, liens sur l'institution (fiche de l'organisme) et le porteur jumelé (/adminjumelages)
@@ -235,6 +235,20 @@ function remplirItem($item, d) {
       modifierSignale = true;
       console.warn('[LPC][Admin] #btnModifier introuvable dans le modèle du répéteur (ou sans onClick) ; type reçu :', b && b.type);
     }
+  });
+  safe('Mail au porteur (#c9, onglet Membres)', () => {
+    // 13/10 (demande de Bruno) : #c9 est libre sur l'onglet Membres (8 colonnes) ; un TEXTE, pas un bouton (le masquage d'un bouton de ligne n'est pas fiable).
+    // Ailleurs #c9 reste une colonne de données (Organismes : « Créé le ») : le code ci-dessus l'a déjà écrite, on retire seulement les classes de bouton.
+    const c = $item('#c9');
+    if (!c || typeof c.hide !== 'function') return;
+    const classes = (() => { try { return c.customClassList; } catch (e) { return null; } })();
+    const retirer = () => { try { if (classes && classes.remove) { classes.remove('lpc-bouton'); classes.remove('lpc-bouton-plein'); } } catch (e) { /* ignoré */ } };
+    if (onglet !== 'membres' || d.nonValide || d.emailPossible !== true) { retirer(); return; }
+    c.text = 'Mail au porteur';
+    retirer();
+    try { if (classes && classes.add) { classes.add('lpc-bouton'); classes.add('lpc-bouton-plein'); } } catch (e) { /* ignoré */ }
+    c.onClick(() => { if (onglet === 'membres' && d.emailPossible === true) envoyerEmailPorteur(c, d); });
+    c.show();
   });
 }
 
@@ -482,6 +496,46 @@ async function valider(ligne) {
 }
 
 /** « Envoyer le lien » (compte Wix à e-mail non vérifié) : Wix envoie à la personne l'e-mail de définition du mot de passe, qui vérifie l'e-mail. */
+const GMAIL_COMPTE = 'lesporteursdechaleur@gmail.com';   // même compte que /adminjumelages (décision du 04/10 : envoi depuis Gmail)
+const LONGUEUR_MAX_URL = 6000;
+let emailEnCours = false;
+/** « Mail au porteur » d'une ligne de l'onglet Membres : fenêtre de rédaction Gmail (même onglet), RIEN n'est envoyé par le site. */
+async function envoyerEmailPorteur(cellule, ligne) {
+  if (emailEnCours || !ligne) return;
+  emailEnCours = true;
+  setTxt('#messageErreur', '');
+  try {
+    const res = (await adminEmailPorteur({ porteur: ligne.id })) || {};
+    console.log('[LPC][Admin] e-mail porteur', { ok: res.ok, reason: res.reason, nb: res.nb, sansAccord: res.sansAccord });
+    if (res.refuse) { refuse(); return; }
+    if (!res.ok) {
+      setTxt('#messageErreur', {
+        'quota-non-rempli': 'Le quota de ce porteur n’est pas rempli : l’e-mail n’est pas disponible.',
+        'pas-d-email': 'Ce porteur n’a pas d’adresse e-mail enregistrée.',
+        'pas-porteur': 'Ce membre n’écrit pas de cartes (ou n’a pas indiqué leur nombre).',
+      }[res.reason] || 'Impossible de préparer l’e-mail.', COULEUR_ERREUR);
+      return;
+    }
+    const url = 'https://mail.google.com/mail/?' + (GMAIL_COMPTE ? 'authuser=' + encodeURIComponent(GMAIL_COMPTE) + '&' : '')
+      + 'view=cm&fs=1&to=' + encodeURIComponent(res.a) + '&su=' + encodeURIComponent(res.objet) + '&body=' + encodeURIComponent(res.corps);
+    let note = '';
+    if (res.sansAccord > 0) note += res.sansAccord + ' résident' + (res.sansAccord > 1 ? 's' : '') + ' sans accord RGPD enregistré : à vérifier avant d’envoyer. ';
+    if (url.length > LONGUEUR_MAX_URL) {
+      try {
+        if (wixWindowFrontend && typeof wixWindowFrontend.copyToClipboard === 'function') {
+          await wixWindowFrontend.copyToClipboard(res.corps);
+          note += 'Le texte du message a aussi été copié dans le presse-papiers. ';
+        }
+      } catch (e) { console.warn('[LPC][Admin] copie dans le presse-papiers KO :', e && e.message); }
+    }
+    if (note) setTxt('#messageErreur', note.trim(), '#B9770E');
+    wixLocation.to(url);
+  } catch (e) {
+    console.error('[LPC][Admin] e-mail porteur KO:', e);
+    setTxt('#messageErreur', 'Impossible de préparer l’e-mail, merci de réessayer dans un instant.', COULEUR_ERREUR);
+  } finally { emailEnCours = false; }
+}
+
 async function envoyerLien(ligne) {
   if (validationEnCours) return;
   validationEnCours = true;
